@@ -31,8 +31,10 @@ router.post('/initialize', verifyToken, async (req, res) => {
     const userRes = await pool.query('SELECT id, email, name FROM users WHERE id = $1', [req.user.userId]);
     const currentUser = userRes.rows[0] || {};
 
-    // Generate unique transaction reference
-    const tx_ref = `LED-${Date.now()}-${req.user.userId}`;
+    // Generate unique transaction reference (must be < 50 chars)
+    // UUID is 36 chars, Date.now() is 13 chars. Total > 50.
+    // We'll use timestamp + short random string
+    const tx_ref = `LED-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     
     let paymentResult;
     let paymentRecord;
@@ -74,7 +76,7 @@ router.post('/initialize', verifyToken, async (req, res) => {
           callback_url: `${process.env.BACKEND_URL}/api/payments/chapa/callback`,
           return_url: `${process.env.FRONTEND_URL}/payment/success`,
           customization: {
-            title: 'LED Screen Payment',
+            title: 'GraceLED Pay', // Max 16 chars
             description: rental_id ? 'Rental Payment' : 'Purchase Payment'
           }
         });

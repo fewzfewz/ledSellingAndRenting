@@ -98,29 +98,42 @@ router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
     await client.query('BEGIN');
     const { sku, title, description, category, base_price, image_url, variants } = req.body;
     
+    console.log('Creating product:', { sku, title, category, base_price, image_url: image_url ? 'provided' : 'null' });
+    
+    // Validate required fields
+    if (!sku || !title || !category || !base_price) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Missing required fields: sku, title, category, base_price' });
+    }
+    
     const productRes = await client.query(
       'INSERT INTO products (sku, title, description, category, base_price, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [sku, title, description, category, base_price, image_url || null]
     );
     
     const product = productRes.rows[0];
+    console.log('Product created:', product.id);
     
     // If variants provided, insert them
     if (variants && variants.length > 0) {
+      console.log('Creating', variants.length, 'variants');
       for (const variant of variants) {
         await client.query(
-          'INSERT INTO product_variants (product_id, name, pixel_pitch, width_cm, height_cm, weight_kg, price, rent_price_per_day, sku) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-          [product.id, variant.name, variant.pixel_pitch, variant.width_cm, variant.height_cm, variant.weight_kg, variant.price, variant.rent_price_per_day, variant.sku]
+          'INSERT INTO product_variants (product_id, name, pixel_pitch, width_cm, height_cm, weight_kg, price, rent_price_per_day) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          [product.id, variant.name, variant.pixel_pitch, variant.width_cm, variant.height_cm, variant.weight_kg, variant.price, variant.rent_price_per_day]
         );
       }
+      console.log('Variants created successfully');
     }
     
     await client.query('COMMIT');
+    console.log('Transaction committed');
     res.status(201).json(product);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error creating product:', err);
+    console.error('Error details:', err.message);
+    res.status(500).json({ error: 'Server error: ' + err.message });
   } finally {
     client.release();
   }

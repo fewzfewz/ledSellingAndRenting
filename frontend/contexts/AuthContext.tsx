@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.token);
     setUser(data.user);
     localStorage.setItem('token', data.token);
+    return data.user;
   };
 
   const register = async (email: string, password: string, name?: string) => {

@@ -22,6 +22,7 @@ interface ProductDetail {
   description: string;
   category: string;
   base_price: string;
+  image_url?: string;
   variants: Variant[];
 }
 
@@ -62,8 +63,19 @@ export default function ProductDetailPage() {
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-2">
             {/* Left: Image Gallery */}
-            <div className="bg-gray-200 h-96 md:h-auto flex items-center justify-center text-gray-400 text-2xl">
-              Product Image
+            <div className="bg-gradient-to-br from-blue-100 to-purple-100 h-96 md:h-auto flex items-center justify-center">
+              {product.image_url ? (
+                <img 
+                  src={product.image_url} 
+                  alt={product.title} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-center p-8">
+                  <div className="text-8xl mb-4">📺</div>
+                  <p className="text-gray-500 text-lg">No Image Available</p>
+                </div>
+              )}
             </div>
             
             {/* Right: Details */}

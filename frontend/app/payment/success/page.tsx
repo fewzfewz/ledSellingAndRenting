@@ -23,17 +23,29 @@ export default function PaymentSuccessPage() {
     } else if (status === 'success') {
       setVerifying(false);
       setPaymentStatus({ status: 'success' });
+    } else {
+      // No parameters present
+      setVerifying(false);
+      setError('No payment information found. Please check your dashboard.');
     }
-  }, [tx_ref, token]);
+  }, [tx_ref, token, status]);
 
   const verifyPayment = async () => {
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+      
+      // Add timeout to fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
       const response = await fetch(`${apiBase}/payments/verify/${tx_ref}`, {
         headers: {
           'Authorization': `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
       
@@ -43,7 +55,11 @@ export default function PaymentSuccessPage() {
         setError('Payment verification failed');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to verify payment');
+      if (err.name === 'AbortError') {
+        setError('Verification timed out. Please check your dashboard for order status.');
+      } else {
+        setError(err.message || 'Failed to verify payment');
+      }
     } finally {
       setVerifying(false);
     }

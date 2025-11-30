@@ -12,9 +12,11 @@ export default function CartPage() {
   const { items, removeItem, updateQuantity, updateItem, cartTotal, clearCart } = useCart();
   const { user } = useAuth();
   const router = useRouter();
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = async () => {
+    setError('');
     if (!user) {
       router.push('/login?redirect=/cart');
       return;
@@ -26,25 +28,16 @@ export default function CartPage() {
       const rentalItems = items.filter(item => item.type === 'rent');
       const saleItems = items.filter(item => item.type === 'buy');
 
-      // For now, let's handle just one type or mixed. 
-      // If mixed, we might need to create two separate orders or a unified one.
-      // Let's assume we create a "Sales Order" for buy items and "Rental" for rent items.
-      // For simplicity in this MVP, let's just process them sequentially or error if mixed (or just handle one).
-      
-      // Actually, let's just create a Rental if there are rental items (and include sale items as extras? No, usually separate).
-      // Let's just support one flow for now or create multiple.
-      
       if (rentalItems.length > 0) {
         // Validate that all rental items have dates selected
         const missingDates = rentalItems.some(item => !item.rentStartDate || !item.rentEndDate);
         if (missingDates) {
-          alert('Please select rental dates for all rental items');
+          setError('Please select rental start and end dates for all rental items to proceed.');
           setLoading(false);
           return;
         }
 
         // Use the first rental item's dates (assuming all rentals use same period for simplicity)
-        // In a more complex system, you might handle multiple rental periods
         const firstRental = rentalItems[0];
         
         const rentalData = {
@@ -81,9 +74,9 @@ export default function CartPage() {
         router.push(`/payment/checkout?orderId=${res.orderId}&amount=${res.total_amount}`);
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to create order');
+      setError(err.message || 'Failed to create order. Please try again.');
       setLoading(false);
     }
   };
@@ -113,12 +106,19 @@ export default function CartPage() {
           {/* Cart Items */}
           <div className="flex-1 bg-white rounded-xl shadow-sm p-6">
             {items.map(item => (
-              <div key={item.id} className="flex items-center py-6 border-b last:border-0">
-                <div className="h-24 w-24 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 flex-shrink-0">
-                  Img
+              <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center py-6 border-b last:border-0 gap-6">
+                {/* Product Image */}
+                <div className="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 flex-shrink-0 overflow-hidden">
+                  {item.image ? (
+                    <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">📺</span>
+                  )}
                 </div>
-                <div className="ml-6 flex-1">
-                  <div className="flex justify-between items-start">
+
+                {/* Product Details */}
+                <div className="flex-1 w-full">
+                  <div className="flex justify-between items-start mb-2">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
                       <p className="text-gray-500 text-sm">{item.variantName}</p>
@@ -128,30 +128,111 @@ export default function CartPage() {
                         {item.type === 'rent' ? 'Rental' : 'Purchase'}
                       </span>
                     </div>
-                    <p className="text-lg font-bold text-gray-900">${item.price}</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      ${item.price}
+                      {item.type === 'rent' && <span className="text-sm font-normal text-gray-500">/day</span>}
+                    </p>
                   </div>
+
+                  {/* Rental Date Selection */}
+                  {item.type === 'rent' && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-3">Select Rental Period</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-blue-800 mb-1">Start Date</label>
+                          <input
+                            type="date"
+                            value={item.rentStartDate ? new Date(item.rentStartDate).toISOString().split('T')[0] : ''}
+                            min={new Date().toISOString().split('T')[0]}
+                            onChange={(e) => {
+                              const startDate = e.target.value;
+                              const endDate = item.rentEndDate;
+                              
+                              // Calculate days if both dates exist
+                              let days = 1;
+                              if (startDate && endDate) {
+                                const start = new Date(startDate);
+                                const end = new Date(endDate);
+                                const diffTime = Math.abs(end.getTime() - start.getTime());
+                                days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive
+                                if (days < 1) days = 1;
+                              }
+
+                              updateItem(item.id, { 
+                                rentStartDate: startDate,
+                                rentDays: days
+                              });
+                            }}
+                            className={`w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 ${
+                              !item.rentStartDate ? 'border-red-300 bg-red-50' : 'border-blue-200'
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-blue-800 mb-1">End Date</label>
+                          <input
+                            type="date"
+                            value={item.rentEndDate ? new Date(item.rentEndDate).toISOString().split('T')[0] : ''}
+                            min={item.rentStartDate ? new Date(item.rentStartDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                            onChange={(e) => {
+                              const endDate = e.target.value;
+                              const startDate = item.rentStartDate;
+                              
+                              // Calculate days
+                              let days = 1;
+                              if (startDate && endDate) {
+                                const start = new Date(startDate);
+                                const end = new Date(endDate);
+                                const diffTime = Math.abs(end.getTime() - start.getTime());
+                                days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive
+                                if (days < 1) days = 1;
+                              }
+
+                              updateItem(item.id, { 
+                                rentEndDate: endDate,
+                                rentDays: days
+                              });
+                            }}
+                            className={`w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 ${
+                              !item.rentEndDate ? 'border-red-300 bg-red-50' : 'border-blue-200'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                      {item.rentDays && item.rentDays > 0 && (
+                        <p className="text-xs text-blue-700 mt-2 text-right">
+                          Duration: <span className="font-bold">{item.rentDays} days</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
                   
+                  {/* Quantity and Remove */}
                   <div className="flex justify-between items-center mt-4">
-                    <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-                      >
-                        -
-                      </button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <button 
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-                      >
-                        +
-                      </button>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm text-gray-500">Quantity:</span>
+                      <div className="flex items-center border border-gray-300 rounded-lg">
+                        <button 
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 text-gray-600"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center font-medium text-gray-900">{item.quantity}</span>
+                        <button 
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 text-gray-600"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                     <button 
                       onClick={() => removeItem(item.id)}
-                      className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center transition-colors"
                     >
-                      Remove
+                      <span className="mr-1">🗑️</span> Remove
                     </button>
                   </div>
                 </div>
@@ -178,6 +259,12 @@ export default function CartPage() {
                   <span>${cartTotal}</span>
                 </div>
               </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                  {error}
+                </div>
+              )}
 
               <button 
                 onClick={handleCheckout}
