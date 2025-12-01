@@ -14,6 +14,8 @@ interface Variant {
   pixel_pitch: string;
   width_cm: string;
   height_cm: string;
+  rental_count?: number;
+  sale_count?: number;
 }
 
 interface ProductDetail {
@@ -120,61 +122,92 @@ export default function ProductDetailPage() {
               )}
 
               {/* Pricing & Actions */}
-              <div className="flex flex-col space-y-4">
-                <div className="flex items-baseline space-x-2">
-                  <span className="text-3xl font-bold text-gray-900">
-                    ${selectedVariant ? selectedVariant.price : product.base_price}
-                  </span>
-                  <span className="text-gray-500">to buy</span>
-                </div>
-                {selectedVariant?.rent_price_per_day && (
-                   <div className="flex items-baseline space-x-2">
-                   <span className="text-xl font-bold text-blue-600">
-                     ${selectedVariant.rent_price_per_day}
-                   </span>
-                   <span className="text-gray-500">/ day to rent</span>
-                 </div>
+              <div className="flex flex-col space-y-6">
+                
+                {/* Purchase Section */}
+                {(selectedVariant?.sale_count || 0) > 0 ? (
+                  <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-green-900">Purchase</h3>
+                      <span className="text-xs font-medium bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                        {selectedVariant?.sale_count} in stock
+                      </span>
+                    </div>
+                    <div className="flex items-baseline space-x-2 mb-4">
+                      <span className="text-3xl font-bold text-gray-900">
+                        ${selectedVariant ? selectedVariant.price : product.base_price}
+                      </span>
+                      <span className="text-gray-500">to buy</span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (!product || !selectedVariant) return;
+                        addItem({
+                          productId: product.id,
+                          variantId: selectedVariant.id,
+                          title: product.title,
+                          variantName: selectedVariant.name,
+                          price: parseFloat(selectedVariant.price),
+                          quantity: 1,
+                          type: 'buy'
+                        });
+                        alert('Added to cart!');
+                      }}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      Add to Purchase Cart
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 opacity-75">
+                     <h3 className="font-semibold text-gray-500 mb-2">Purchase</h3>
+                     <p className="text-sm text-gray-500">Currently out of stock for purchase.</p>
+                  </div>
                 )}
 
-                <div className="flex space-x-4 pt-4">
-                  <button 
-                    onClick={() => {
-                      if (!product || !selectedVariant) return;
-                      addItem({
-                        productId: product.id,
-                        variantId: selectedVariant.id,
-                        title: product.title,
-                        variantName: selectedVariant.name,
-                        price: parseFloat(selectedVariant.price),
-                        quantity: 1,
-                        type: 'buy'
-                      });
-                      alert('Added to cart!');
-                    }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Add to Cart
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (!product || !selectedVariant) return;
-                      addItem({
-                        productId: product.id,
-                        variantId: selectedVariant.id,
-                        title: product.title,
-                        variantName: selectedVariant.name,
-                        price: parseFloat(selectedVariant.rent_price_per_day || '0'),
-                        quantity: 1,
-                        type: 'rent',
-                        rentDays: 1
-                      });
-                      alert('Added rental request to cart!');
-                    }}
-                    className="flex-1 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Request Rental
-                  </button>
-                </div>
+                {/* Rental Section */}
+                {(selectedVariant?.rental_count || 0) > 0 ? (
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-purple-900">Rental</h3>
+                      <span className="text-xs font-medium bg-purple-200 text-purple-800 px-2 py-1 rounded-full">
+                        {selectedVariant?.rental_count} available
+                      </span>
+                    </div>
+                    {selectedVariant?.rent_price_per_day && (
+                      <div className="flex items-baseline space-x-2 mb-4">
+                        <span className="text-3xl font-bold text-purple-700">
+                          ${selectedVariant.rent_price_per_day}
+                        </span>
+                        <span className="text-gray-500">/ day</span>
+                      </div>
+                    )}
+                    <button 
+                      onClick={() => {
+                        if (!product || !selectedVariant) return;
+                        addItem({
+                          productId: product.id,
+                          variantId: selectedVariant.id,
+                          title: product.title,
+                          variantName: selectedVariant.name,
+                          price: parseFloat(selectedVariant.rent_price_per_day || '0'),
+                          quantity: 1,
+                          type: 'rent',
+                          rentDays: 1
+                        });
+                        alert('Added rental request to cart!');
+                      }}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      Add to Rental Cart
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 opacity-75">
+                     <h3 className="font-semibold text-gray-500 mb-2">Rental</h3>
+                     <p className="text-sm text-gray-500">Currently unavailable for rent.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

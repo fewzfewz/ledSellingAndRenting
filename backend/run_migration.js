@@ -4,10 +4,10 @@ const pool = require('./db');
 
 async function runMigration() {
   try {
-    const sqlPath = path.join(__dirname, 'migrations', '003_add_address_to_orders.sql');
+    const sqlPath = path.join(__dirname, 'migrations', '006_add_delivery_address_to_rentals.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
     
-    console.log('Running migration...');
+    console.log('Running delivery_address migration...');
     await pool.query(sql);
     console.log('Migration completed successfully');
     process.exit(0);

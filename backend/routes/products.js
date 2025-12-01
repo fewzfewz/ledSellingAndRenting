@@ -4,52 +4,83 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// List products
+// List products (only show products with available inventory for customers)
 router.get('/', async (req, res) => {
   try {
-    const { category, q, page = 1, limit = 20 } = req.query;
-    let query = 'SELECT * FROM products WHERE 1=1';
+    const { category, q, page = 1, limit = 20, show_all } = req.query;
+    
+    // Base query - join with inventory to check availability
+    let query = `
+      SELECT DISTINCT p.*, 
+        COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'rental') as rental_count,
+        COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'sale') as sale_count
+      FROM products p
+      LEFT JOIN product_variants pv ON p.id = pv.product_id
+      LEFT JOIN inventory_units i ON pv.id = i.variant_id
+      WHERE 1=1
+    `;
     const params = [];
     let paramCount = 1;
 
     if (category) {
-      query += ` AND category = $${paramCount}`;
+      query += ` AND p.category = $${paramCount}`;
       params.push(category);
       paramCount++;
     }
     
     // Search by title or description
     if (q) {
-      query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+      query += ` AND (p.title ILIKE $${paramCount} OR p.description ILIKE $${paramCount})`;
       params.push(`%${q}%`);
       paramCount++;
     }
 
+    query += ` GROUP BY p.id`;
+
+    // Only show products with available inventory (unless admin requests all)
+    if (!show_all || show_all !== 'true') {
+      query += ` HAVING (COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'rental') > 0 
+                 OR COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'sale') > 0)`;
+    }
+
     // Add pagination
     const offset = (parseInt(page) - 1) * parseInt(limit);
-    query += ` ORDER BY created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    query += ` ORDER BY p.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(parseInt(limit), offset);
 
     const result = await pool.query(query, params);
     
-    // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) FROM products WHERE 1=1';
+    // Get total count
+    let countQuery = `
+      SELECT p.id
+      FROM products p
+      LEFT JOIN product_variants pv ON p.id = pv.product_id
+      LEFT JOIN inventory_units i ON pv.id = i.variant_id
+      WHERE 1=1
+    `;
     const countParams = [];
     let countParamCount = 1;
     
     if (category) {
-      countQuery += ` AND category = $${countParamCount}`;
+      countQuery += ` AND p.category = $${countParamCount}`;
       countParams.push(category);
       countParamCount++;
     }
     
     if (q) {
-      countQuery += ` AND (title ILIKE $${countParamCount} OR description ILIKE $${countParamCount})`;
+      countQuery += ` AND (p.title ILIKE $${countParamCount} OR p.description ILIKE $${countParamCount})`;
       countParams.push(`%${q}%`);
+    }
+
+    countQuery += ` GROUP BY p.id`;
+
+    if (!show_all || show_all !== 'true') {
+      countQuery += ` HAVING (COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'rental') > 0 
+                       OR COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'sale') > 0)`;
     }
     
     const countResult = await pool.query(countQuery, countParams);
-    const totalCount = parseInt(countResult.rows[0].count);
+    const totalCount = countResult.rows.length;
     
     res.json({
       products: result.rows,
@@ -78,7 +109,15 @@ router.get('/:id', async (req, res) => {
     
     const product = productRes.rows[0];
     
-    const variantsRes = await pool.query('SELECT * FROM product_variants WHERE product_id = $1', [id]);
+    const variantsRes = await pool.query(`
+      SELECT pv.*, 
+        COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'rental') as rental_count,
+        COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'available' AND i.inventory_type = 'sale') as sale_count
+      FROM product_variants pv
+      LEFT JOIN inventory_units i ON pv.id = i.variant_id
+      WHERE pv.product_id = $1
+      GROUP BY pv.id
+    `, [id]);
     product.variants = variantsRes.rows;
     
     const mediaRes = await pool.query('SELECT * FROM media WHERE product_id = $1 ORDER BY order_index', [id]);

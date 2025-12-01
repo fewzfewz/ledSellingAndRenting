@@ -74,7 +74,7 @@ router.post('/initialize', verifyToken, async (req, res) => {
           last_name: customer_info.last_name || (currentUser.name && currentUser.name.split(' ')[1] ? currentUser.name.split(' ')[1] : ''),
           tx_ref,
           callback_url: `${process.env.BACKEND_URL}/api/payments/chapa/callback`,
-          return_url: `${process.env.FRONTEND_URL}/payment/success`,
+          return_url: `${process.env.FRONTEND_URL}/payment/success?tx_ref=${tx_ref}`,
           customization: {
             title: 'GraceLED Pay', // Max 16 chars
             description: rental_id ? 'Rental Payment' : 'Purchase Payment'

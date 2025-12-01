@@ -92,6 +92,10 @@ export default function PaymentCheckout({
         throw new Error(data.error || 'Payment initialization failed');
       }
 
+      if (data.tx_ref) {
+        localStorage.setItem('pending_payment_ref', data.tx_ref);
+      }
+
       if (data.checkout_url) {
         window.location.href = data.checkout_url;
       } else if (data.clientSecret) {

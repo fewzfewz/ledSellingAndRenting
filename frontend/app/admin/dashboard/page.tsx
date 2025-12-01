@@ -44,7 +44,8 @@ export default function AdminDashboard() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to fetch dashboard data');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.details || 'Failed to fetch dashboard data');
       }
 
       const data = await res.json();
@@ -58,13 +59,10 @@ export default function AdminDashboard() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading dashboard...</p>
-          </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
         </div>
       </div>
     );
@@ -72,11 +70,18 @@ export default function AdminDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-900">
         <Navbar />
         <div className="container mx-auto px-4 py-12">
-          <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg">
-            {error}
+          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-6 py-4 rounded-xl backdrop-blur-sm">
+            <h3 className="text-lg font-bold mb-2">Error Loading Dashboard</h3>
+            <p>{error}</p>
+            <button 
+              onClick={fetchDashboardData}
+              className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
@@ -84,224 +89,230 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <Navbar />
       
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-8 shadow-lg">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">👑 Admin Dashboard</h1>
-              <p className="text-blue-100">Welcome back, {user?.name || 'Admin'}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-blue-100">Last updated</p>
-              <p className="text-lg font-semibold">{new Date().toLocaleTimeString()}</p>
-            </div>
-          </div>
-        </div>
+      {/* Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link href="/products" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-lg transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-blue-500">
-              <div className="text-4xl mb-2">📦</div>
-              <div className="font-semibold text-gray-900">Manage Products</div>
-              <div className="text-sm text-gray-500">Add, edit, delete</div>
-            </Link>
-            
-            <Link href="/admin/inventory" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-lg transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-green-500">
-              <div className="text-4xl mb-2">📊</div>
-              <div className="font-semibold text-gray-900">Inventory</div>
-              <div className="text-sm text-gray-500">Track stock</div>
-            </Link>
-            
-            <Link href="/dashboard" className="bg-white rounded-xl shadow-sm p-6 hover:shadow-lg transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-purple-500">
-              <div className="text-4xl mb-2">📋</div>
-              <div className="font-semibold text-gray-900">Orders</div>
-              <div className="text-sm text-gray-500">View all orders</div>
-            </Link>
-            
-            <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-lg transition-all transform hover:-translate-y-1 border-2 border-transparent hover:border-yellow-500 cursor-pointer">
-              <div className="text-4xl mb-2">⚙️</div>
-              <div className="font-semibold text-gray-900">Settings</div>
-              <div className="text-sm text-gray-500">Configure system</div>
+      <div className="relative container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 pb-6 border-b border-white/10">
+          <div>
+            <h1 className="text-4xl font-black mb-2">
+              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Admin Dashboard
+              </span>
+            </h1>
+            <p className="text-gray-400">
+              Welcome back, <span className="text-white font-semibold">{user?.name || 'Admin'}</span>
+            </p>
+          </div>
+          <div className="text-right mt-4 md:mt-0">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-sm text-gray-300">System Online</span>
             </div>
           </div>
         </div>
 
-        {/* Key Metrics */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Key Metrics</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Total Revenue */}
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+        {/* Key Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {/* Revenue Card */}
+          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative z-10">
               <div className="flex justify-between items-start mb-4">
-                <div className="text-5xl">💰</div>
-                <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
-                  Total
+                <div className="p-3 bg-green-500/20 rounded-xl">
+                  <span className="text-2xl">💰</span>
                 </div>
+                <span className="text-xs font-medium px-2 py-1 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20">
+                  +12% vs last month
+                </span>
               </div>
-              <div className="text-sm font-medium opacity-90 mb-1">Total Revenue</div>
-              <div className="text-3xl font-bold">${stats?.totalRevenue?.toFixed(2) || '0.00'}</div>
-              <div className="mt-3 text-xs opacity-75">
-                Rental: ${stats?.rentalRevenue?.toFixed(2) || '0'} | Sales: ${stats?.salesRevenue?.toFixed(2) || '0'}
+              <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
+              <h3 className="text-3xl font-bold text-white mb-2">
+                ${stats?.totalRevenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+              </h3>
+              <div className="flex gap-2 text-xs text-gray-500">
+                <span>Rent: ${stats?.rentalRevenue?.toLocaleString()}</span>
+                <span>•</span>
+                <span>Sales: ${stats?.salesRevenue?.toLocaleString()}</span>
               </div>
             </div>
+          </div>
 
-            {/* Total Products */}
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+          {/* Products Card */}
+          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative z-10">
               <div className="flex justify-between items-start mb-4">
-                <div className="text-5xl">📦</div>
-                <Link href="/products" className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs font-semibold transition-colors">
+                <div className="p-3 bg-blue-500/20 rounded-xl">
+                  <span className="text-2xl">📦</span>
+                </div>
+                <Link href="/products" className="text-xs font-medium px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
                   View All
                 </Link>
               </div>
-              <div className="text-sm font-medium opacity-90 mb-1">Total Products</div>
-              <div className="text-3xl font-bold">{stats?.totalProducts || 0}</div>
-              <div className="mt-3 text-xs opacity-75">
-                Active catalog items
-              </div>
+              <p className="text-gray-400 text-sm mb-1">Total Products</p>
+              <h3 className="text-3xl font-bold text-white mb-2">
+                {stats?.totalProducts || 0}
+              </h3>
+              <p className="text-xs text-gray-500">Active catalog items</p>
             </div>
+          </div>
 
-            {/* Total Rentals */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+          {/* Rentals Card */}
+          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative z-10">
               <div className="flex justify-between items-start mb-4">
-                <div className="text-5xl">🎬</div>
-                <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
-                  Bookings
+                <div className="p-3 bg-purple-500/20 rounded-xl">
+                  <span className="text-2xl">🎬</span>
                 </div>
+                <Link href="/admin/orders" className="text-xs font-medium px-2 py-1 bg-purple-500/10 text-purple-400 rounded-lg border border-purple-500/20 hover:bg-purple-500/20 transition-colors">
+                  Manage
+                </Link>
               </div>
-              <div className="text-sm font-medium opacity-90 mb-1">Total Rentals</div>
-              <div className="text-3xl font-bold">{stats?.totalRentals || 0}</div>
-              <div className="mt-3 text-xs opacity-75">
-                Rental transactions
-              </div>
+              <p className="text-gray-400 text-sm mb-1">Total Rentals</p>
+              <h3 className="text-3xl font-bold text-white mb-2">
+                {stats?.totalRentals || 0}
+              </h3>
+              <p className="text-xs text-gray-500">Lifetime bookings</p>
             </div>
+          </div>
 
-            {/* Total Users */}
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
+          {/* Users Card */}
+          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="relative z-10">
               <div className="flex justify-between items-start mb-4">
-                <div className="text-5xl">👥</div>
-                <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">
-                  Customers
+                <div className="p-3 bg-orange-500/20 rounded-xl">
+                  <span className="text-2xl">👥</span>
                 </div>
+                <span className="text-xs font-medium px-2 py-1 bg-orange-500/10 text-orange-400 rounded-lg border border-orange-500/20">
+                  Active
+                </span>
               </div>
-              <div className="text-sm font-medium opacity-90 mb-1">Total Users</div>
-              <div className="text-3xl font-bold">{stats?.totalUsers || 0}</div>
-              <div className="mt-3 text-xs opacity-75">
-                Registered accounts
-              </div>
+              <p className="text-gray-400 text-sm mb-1">Total Users</p>
+              <h3 className="text-3xl font-bold text-white mb-2">
+                {stats?.totalUsers || 0}
+              </h3>
+              <p className="text-xs text-gray-500">Registered accounts</p>
             </div>
           </div>
         </div>
 
-        {/* Detailed Stats */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Revenue Breakdown */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-              <span className="text-2xl mr-2">💵</span>
-              Revenue Breakdown
-            </h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                  <span className="font-medium text-gray-700">Rental Revenue</span>
-                </div>
-                <span className="text-xl font-bold text-blue-600">${stats?.rentalRevenue?.toFixed(2) || '0.00'}</span>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                  <span className="font-medium text-gray-700">Sales Revenue</span>
-                </div>
-                <span className="text-xl font-bold text-green-600">${stats?.salesRevenue?.toFixed(2) || '0.00'}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-2 border-purple-200">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
-                  <span className="font-bold text-gray-900">Total Revenue</span>
-                </div>
-                <span className="text-2xl font-bold text-purple-600">${stats?.totalRevenue?.toFixed(2) || '0.00'}</span>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+          {/* Quick Actions */}
+          <div className="lg:col-span-2">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span className="w-1 h-6 bg-blue-500 rounded-full"></span>
+              Quick Actions
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { title: 'Add Product', icon: '📦', href: '/admin/products/new', color: 'blue' },
+                { title: 'Inventory', icon: '📊', href: '/admin/inventory', color: 'green' },
+                { title: 'Orders', icon: '📋', href: '/admin/orders', color: 'purple' },
+                { title: 'Settings', icon: '⚙️', href: '/admin/settings', color: 'gray' },
+              ].map((action, idx) => (
+                <Link 
+                  key={idx}
+                  href={action.href}
+                  className="group relative p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl transition-all duration-300 hover:-translate-y-1 text-center"
+                >
+                  <div className={`w-12 h-12 mx-auto mb-4 rounded-xl bg-${action.color}-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform`}>
+                    {action.icon}
+                  </div>
+                  <h3 className="font-semibold text-gray-200 group-hover:text-white transition-colors">
+                    {action.title}
+                  </h3>
+                </Link>
+              ))}
             </div>
           </div>
 
           {/* Inventory Status */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-              <span className="text-2xl mr-2">📊</span>
-              Inventory Status
-            </h3>
-            <div className="space-y-3">
-              {stats?.inventoryStatus && Object.keys(stats.inventoryStatus).length > 0 ? (
-                Object.entries(stats.inventoryStatus).map(([status, count]) => {
-                  const colors: Record<string, string> = {
-                    available: 'bg-green-100 text-green-700 border-green-200',
-                    rented: 'bg-blue-100 text-blue-700 border-blue-200',
-                    maintenance: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-                    damaged: 'bg-red-100 text-red-700 border-red-200',
-                    retired: 'bg-gray-100 text-gray-700 border-gray-200'
-                  };
-                  
-                  return (
-                    <div key={status} className={`flex items-center justify-between p-4 rounded-lg border-2 ${colors[status] || 'bg-gray-100 text-gray-700'}`}>
-                      <span className="font-medium capitalize">{status}</span>
-                      <span className="text-2xl font-bold">{count}</span>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="text-4xl mb-2">📦</div>
-                  <p>No inventory data available</p>
-                  <Link href="/admin/inventory/new" className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2 inline-block">
-                    Add inventory units →
-                  </Link>
-                </div>
-              )}
+          <div>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
+              Inventory Health
+            </h2>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <div className="space-y-4">
+                {stats?.inventoryStatus && Object.keys(stats.inventoryStatus).length > 0 ? (
+                  Object.entries(stats.inventoryStatus).map(([status, count]) => {
+                    const config: Record<string, { color: string, label: string }> = {
+                      available: { color: 'bg-green-500', label: 'Available' },
+                      rented: { color: 'bg-blue-500', label: 'Rented' },
+                      maintenance: { color: 'bg-yellow-500', label: 'Maintenance' },
+                      damaged: { color: 'bg-red-500', label: 'Damaged' },
+                      retired: { color: 'bg-gray-500', label: 'Retired' }
+                    };
+                    const { color, label } = config[status] || { color: 'bg-gray-500', label: status };
+                    const total = Object.values(stats.inventoryStatus).reduce((a, b) => a + b, 0);
+                    const percentage = Math.round((count / total) * 100);
+
+                    return (
+                      <div key={status} className="group">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-300">{label}</span>
+                          <span className="text-gray-400">{count} units ({percentage}%)</span>
+                        </div>
+                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${color} opacity-80 group-hover:opacity-100 transition-all duration-500`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No inventory data available</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <Link 
+                  href="/admin/inventory"
+                  className="block w-full py-3 text-center bg-white/5 hover:bg-white/10 rounded-xl text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                >
+                  View Detailed Report
+                </Link>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* System Status */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <span className="text-2xl mr-2">🔧</span>
+        {/* System Status Grid */}
+        <div>
+          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <span className="w-1 h-6 bg-green-500 rounded-full"></span>
             System Status
-          </h3>
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-3xl mb-2">✅</div>
-              <div className="text-sm font-medium text-gray-700">API Status</div>
-              <div className="text-xs text-green-600 font-semibold">Online</div>
-            </div>
-            
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-3xl mb-2">💾</div>
-              <div className="text-sm font-medium text-gray-700">Database</div>
-              <div className="text-xs text-green-600 font-semibold">Connected</div>
-            </div>
-            
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-3xl mb-2">📈</div>
-              <div className="text-sm font-medium text-gray-700">Orders</div>
-              <div className="text-xs text-blue-600 font-semibold">{stats?.totalOrders || 0} Total</div>
-            </div>
-            
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-3xl mb-2">🎯</div>
-              <div className="text-sm font-medium text-gray-700">Performance</div>
-              <div className="text-xs text-purple-600 font-semibold">Excellent</div>
-            </div>
+            {[
+              { label: 'API Status', status: 'Online', color: 'green', icon: '⚡' },
+              { label: 'Database', status: 'Connected', color: 'blue', icon: '💾' },
+              { label: 'Orders', status: `${stats?.totalOrders || 0} Total`, color: 'purple', icon: '📈' },
+              { label: 'Performance', status: 'Optimal', color: 'emerald', icon: '🚀' },
+            ].map((item, idx) => (
+              <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-lg bg-${item.color}-500/20 flex items-center justify-center text-xl`}>
+                  {item.icon}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-semibold">{item.label}</p>
+                  <p className={`text-sm font-bold text-${item.color}-400`}>{item.status}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

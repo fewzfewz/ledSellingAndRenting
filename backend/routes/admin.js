@@ -24,14 +24,16 @@ router.get('/dashboard', verifyToken, requireRole('admin'), async (req, res) => 
     const totalOrders = parseInt(ordersResult.rows[0].total_orders);
 
     // Get total revenue from rentals
+    // Include active, returned, and completed rentals
     const rentalRevenueResult = await pool.query(
-      "SELECT COALESCE(SUM(total_amount), 0) as rental_revenue FROM rentals WHERE status = 'completed'"
+      "SELECT COALESCE(SUM(total_amount), 0) as rental_revenue FROM rentals WHERE status IN ('active', 'returned', 'completed')"
     );
     const rentalRevenue = parseFloat(rentalRevenueResult.rows[0].rental_revenue);
 
     // Get total revenue from sales
+    // Include paid, shipped, delivered, and completed orders
     const salesRevenueResult = await pool.query(
-      "SELECT COALESCE(SUM(total_amount), 0) as sales_revenue FROM sales_orders WHERE status IN ('paid', 'shipped', 'complete')"
+      "SELECT COALESCE(SUM(total_amount), 0) as sales_revenue FROM sales_orders WHERE status IN ('paid', 'shipped', 'delivered', 'completed')"
     );
     const salesRevenue = parseFloat(salesRevenueResult.rows[0].sales_revenue);
 
@@ -69,18 +71,18 @@ router.get('/dashboard', verifyToken, requireRole('admin'), async (req, res) => 
       recentRentals: recentRentalsResult.rows
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error fetching admin dashboard data:', err);
+    res.status(500).json({ error: 'Server error fetching dashboard data', details: err.message });
   }
 });
 
 // Get all inventory units with filtering
 router.get('/inventory', verifyToken, requireRole('admin'), async (req, res) => {
   try {
-    const { status, search, variant_id } = req.query;
+    const { status, search, variant_id, type } = req.query;
     
     let query = `
-      SELECT iu.*, pv.sku, p.title as product_title, p.id as product_id
+      SELECT iu.*, p.sku, p.title as product_title, p.id as product_id
       FROM inventory_units iu
       JOIN product_variants pv ON iu.variant_id = pv.id
       JOIN products p ON pv.product_id = p.id
@@ -92,6 +94,12 @@ router.get('/inventory', verifyToken, requireRole('admin'), async (req, res) => 
     if (status) {
       query += ` AND iu.status = $${paramCount}`;
       params.push(status);
+      paramCount++;
+    }
+
+    if (type) {
+      query += ` AND iu.inventory_type = $${paramCount}`;
+      params.push(type);
       paramCount++;
     }
 
@@ -118,28 +126,76 @@ router.get('/inventory', verifyToken, requireRole('admin'), async (req, res) => 
 });
 
 // Add new inventory unit
+// Add new inventory unit (with optional new product creation)
 router.post('/inventory', verifyToken, requireRole('admin'), async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { variant_id, serial_number, status, location } = req.body;
+    await client.query('BEGIN');
+    
+    const { 
+      is_new_product,
+      // Inventory fields
+      serial_number, status, location, inventory_type,
+      // Existing product fields
+      variant_id,
+      // New product fields
+      title, description, category, base_price, sku, image_url,
+      // New variant fields
+      pixel_pitch, width_cm, height_cm, rent_price_per_day
+    } = req.body;
 
-    if (!variant_id || !serial_number) {
-      return res.status(400).json({ error: 'variant_id and serial_number are required' });
+    if (!serial_number) {
+      throw new Error('serial_number is required');
     }
 
-    const result = await pool.query(
-      'INSERT INTO inventory_units (variant_id, serial_number, status, location) VALUES ($1, $2, $3, $4) RETURNING *',
-      [variant_id, serial_number, status || 'available', location]
+    if (!inventory_type || !['rental', 'sale'].includes(inventory_type)) {
+      throw new Error('inventory_type must be either "rental" or "sale"');
+    }
+
+    let finalVariantId = variant_id;
+
+    if (is_new_product) {
+      // Validate new product fields
+      if (!title || !base_price || !sku) {
+        throw new Error('Title, base_price, and SKU are required for new products');
+      }
+
+      // 1. Create Product
+      const productRes = await client.query(
+        'INSERT INTO products (title, description, category, base_price, sku, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        [title, description, category, base_price, sku, image_url || null]
+      );
+      const productId = productRes.rows[0].id;
+
+      // 2. Create Default Variant
+      const variantRes = await client.query(
+        'INSERT INTO product_variants (product_id, name, price, pixel_pitch, width_cm, height_cm, rent_price_per_day) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+        [productId, 'Standard', base_price, pixel_pitch || null, width_cm || null, height_cm || null, rent_price_per_day || null]
+      );
+      finalVariantId = variantRes.rows[0].id;
+    } else {
+      if (!finalVariantId) {
+        throw new Error('variant_id is required for existing products');
+      }
+    }
+
+    // 3. Create Inventory Unit
+    const result = await client.query(
+      'INSERT INTO inventory_units (variant_id, serial_number, status, location, inventory_type) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [finalVariantId, serial_number, status || 'available', location, inventory_type]
     );
 
+    await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err);
-    if (err.code === '23505') { // Unique violation
-      return res.status(400).json({ error: 'Serial number already exists' });
-    }
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: err.message || 'Server error' });
+  } finally {
+    client.release();
   }
 });
+
 
 // Update inventory unit
 router.put('/inventory/:id', verifyToken, requireRole('admin'), async (req, res) => {

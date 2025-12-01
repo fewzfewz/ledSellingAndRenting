@@ -1,152 +1,234 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const [editMode, setEditMode] = useState(false);
-  const [heroContent, setHeroContent] = useState({
-    title: 'Premium LED Screens',
-    subtitle: 'For Sale & Rent',
-    description: 'Transform your events and spaces with our high-definition indoor and outdoor LED displays.'
-  });
+  const [scrollY, setScrollY] = useState(0);
 
-  const [features, setFeatures] = useState([
-    { icon: '💎', title: 'Premium Quality', description: 'Top-tier LED panels with high refresh rates and vibrant colors.' },
-    { icon: '🛠️', title: 'Expert Installation', description: 'Our professional team handles setup, operation, and teardown.' },
-    { icon: '🚀', title: 'Fast Delivery', description: 'Quick turnaround for rentals and sales with reliable logistics.' }
-  ]);
+  useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-hidden">
       <Navbar />
       
-      {/* Admin Controls */}
-      {isAdmin && (
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4">
-          <div className="container mx-auto flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">👑 Admin Mode</span>
-            </div>
-            <button
-              onClick={() => setEditMode(!editMode)}
-              className="px-4 py-2 bg-white text-purple-600 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
+      {/* Hero Section with Animated Background */}
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-full blur-3xl animate-spin-slow"></div>
+        </div>
+
+        {/* Grid Pattern Overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.02)_1px,transparent_1px)] bg-[size:100px_100px]"></div>
+
+        {/* Hero Content */}
+        <div className="relative z-10 container mx-auto px-4 py-20 text-center" style={{ transform: `translateY(${scrollY * 0.5}px)` }}>
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-full mb-8 backdrop-blur-sm">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+            <span className="text-sm text-gray-300 font-medium">Premium LED Solutions</span>
+          </div>
+
+          {/* Main Heading */}
+          <h1 className="text-6xl md:text-8xl font-black mb-6 leading-tight">
+            <span className="bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent animate-gradient">
+              Transform Your
+            </span>
+            <br />
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient-shift">
+              Visual Experience
+            </span>
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed">
+            Premium LED screens for <span className="text-blue-400 font-semibold">sale</span> and <span className="text-purple-400 font-semibold">rent</span>. 
+            <br className="hidden md:block" />
+            Elevate your events, advertising, and spaces with stunning displays.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+            <Link 
+              href="/products" 
+              className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white font-bold text-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50"
             >
-              {editMode ? '✓ Save Changes' : '✏️ Edit Page'}
-            </button>
+              <span className="relative z-10 flex items-center gap-2">
+                Browse Screens
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            </Link>
+            
+            <Link 
+              href="/products" 
+              className="group px-8 py-4 bg-white/5 backdrop-blur-sm border-2 border-white/20 rounded-xl text-white font-bold text-lg hover:bg-white/10 hover:border-white/40 transition-all duration-300 hover:scale-105"
+            >
+              <span className="flex items-center gap-2">
+                Get a Quote
+                <svg className="w-5 h-5 group-hover:rotate-45 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </span>
+            </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-8 max-w-3xl mx-auto">
+            {[
+              { value: '500+', label: 'Events Powered' },
+              { value: '99%', label: 'Client Satisfaction' },
+              { value: '24/7', label: 'Support Available' }
+            ].map((stat, idx) => (
+              <div key={idx} className="group cursor-default">
+                <div className="text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2 group-hover:scale-110 transition-transform">
+                  {stat.value}
+                </div>
+                <div className="text-sm text-gray-500 font-medium">{stat.label}</div>
+              </div>
+            ))}
           </div>
         </div>
-      )}
-      
-      {/* Hero Section */}
-      <div className="relative bg-gray-900 text-white">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-black opacity-50"></div>
-          <div className="h-full w-full bg-gradient-to-r from-blue-900 to-purple-900"></div>
-        </div>
-        
-        <div className="relative container mx-auto px-4 py-32 flex flex-col items-center text-center">
-          {editMode ? (
-            <div className="w-full max-w-2xl space-y-4">
-              <input
-                type="text"
-                value={heroContent.title}
-                onChange={(e) => setHeroContent({...heroContent, title: e.target.value})}
-                className="w-full px-4 py-3 text-4xl font-bold text-center bg-white/10 border-2 border-white/30 rounded-lg text-white placeholder-white/50"
-              />
-              <input
-                type="text"
-                value={heroContent.subtitle}
-                onChange={(e) => setHeroContent({...heroContent, subtitle: e.target.value})}
-                className="w-full px-4 py-3 text-3xl font-bold text-center bg-white/10 border-2 border-blue-400 rounded-lg text-blue-400 placeholder-blue-300"
-              />
-              <textarea
-                value={heroContent.description}
-                onChange={(e) => setHeroContent({...heroContent, description: e.target.value})}
-                className="w-full px-4 py-3 text-lg text-center bg-white/10 border-2 border-white/30 rounded-lg text-gray-300 placeholder-gray-400"
-                rows={3}
-              />
-            </div>
-          ) : (
-            <>
-              <h1 className="text-5xl md:text-7xl font-bold mb-6">
-                {heroContent.title} <br />
-                <span className="text-blue-400">{heroContent.subtitle}</span>
-              </h1>
-              <p className="text-xl md:text-2xl mb-10 max-w-2xl text-gray-300">
-                {heroContent.description}
-              </p>
-            </>
-          )}
-          
-          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 mt-6">
-            <Link href="/products" className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-lg text-lg font-semibold transition-colors">
-              Shop Screens
-            </Link>
-            <Link href="/products" className="px-8 py-4 bg-transparent border-2 border-white hover:bg-white hover:text-gray-900 rounded-lg text-lg font-semibold transition-colors">
-              Rent a Screen
-            </Link>
+
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center pt-2">
+            <div className="w-1 h-3 bg-white/50 rounded-full"></div>
           </div>
         </div>
       </div>
 
       {/* Features Section */}
-      <div className="py-20 container mx-auto px-4">
-        <div className="flex justify-between items-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-800">Why Choose Us?</h2>
-          {isAdmin && editMode && (
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-              + Add Feature
-            </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
-            <div key={index} className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow relative group">
-              {isAdmin && editMode && (
-                <button className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                  Delete
-                </button>
-              )}
-              <div className="text-blue-500 text-4xl mb-4">{feature.icon}</div>
-              {editMode ? (
-                <>
-                  <input
-                    type="text"
-                    value={feature.title}
-                    onChange={(e) => {
-                      const newFeatures = [...features];
-                      newFeatures[index].title = e.target.value;
-                      setFeatures(newFeatures);
-                    }}
-                    className="w-full px-3 py-2 text-xl font-bold mb-2 border-2 border-blue-300 rounded"
-                  />
-                  <textarea
-                    value={feature.description}
-                    onChange={(e) => {
-                      const newFeatures = [...features];
-                      newFeatures[index].description = e.target.value;
-                      setFeatures(newFeatures);
-                    }}
-                    className="w-full px-3 py-2 text-gray-600 border-2 border-gray-300 rounded"
-                    rows={3}
-                  />
-                </>
-              ) : (
-                <>
-                  <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
-                </>
-              )}
-            </div>
-          ))}
+      <div className="relative py-32 bg-gradient-to-b from-transparent to-gray-900/50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-black mb-6">
+              <span className="bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+                Why Choose Us?
+              </span>
+            </h2>
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+              Industry-leading technology meets exceptional service
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { 
+                icon: '💎', 
+                title: 'Premium Quality', 
+                description: 'Top-tier LED panels with ultra-high refresh rates, vibrant colors, and crystal-clear resolution.',
+                gradient: 'from-blue-500 to-cyan-500'
+              },
+              { 
+                icon: '⚡', 
+                title: 'Lightning Fast', 
+                description: 'Same-day delivery available. Quick setup and teardown by our expert technical team.',
+                gradient: 'from-purple-500 to-pink-500'
+              },
+              { 
+                icon: '🛡️', 
+                title: 'Fully Insured', 
+                description: 'Complete coverage and 24/7 technical support. Your event success is our priority.',
+                gradient: 'from-orange-500 to-red-500'
+              }
+            ].map((feature, idx) => (
+              <div 
+                key={idx} 
+                className="group relative p-8 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-sm rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105 hover:shadow-2xl"
+              >
+                {/* Gradient Glow */}
+                <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity duration-500 blur-xl`}></div>
+                
+                <div className="relative z-10">
+                  <div className="text-6xl mb-6 group-hover:scale-110 transition-transform duration-300">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-blue-400 group-hover:to-purple-400 transition-all">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* CTA Section */}
+      <div className="relative py-32">
+        <div className="container mx-auto px-4">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-1">
+            <div className="bg-gray-900 rounded-3xl p-12 md:p-20 text-center">
+              <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
+                Ready to Shine?
+              </h2>
+              <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+                Let's bring your vision to life with our premium LED displays
+              </p>
+              <Link 
+                href="/products" 
+                className="inline-flex items-center gap-3 px-10 py-5 bg-white text-gray-900 rounded-xl font-bold text-lg hover:scale-105 transition-transform duration-300 hover:shadow-2xl"
+              >
+                Explore Our Collection
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-12">
+        <div className="container mx-auto px-4 text-center text-gray-500">
+          <p>&copy; 2024 GraceLED. Premium LED Solutions.</p>
+        </div>
+      </footer>
+
+      <style jsx>{`
+        @keyframes gradient {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        @keyframes gradient-shift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        @keyframes spin-slow {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 3s ease infinite;
+        }
+        .animate-gradient-shift {
+          background-size: 200% 200%;
+          animation: gradient-shift 4s ease infinite;
+        }
+        .animate-spin-slow {
+          animation: spin-slow 20s linear infinite;
+        }
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+      `}</style>
     </main>
   );
 }

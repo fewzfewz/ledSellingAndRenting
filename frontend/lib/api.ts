@@ -43,6 +43,28 @@ export async function apiPost(path: string, data: any, init: RequestInit = {}) {
   return res.json();
 }
 
+export async function apiPut(path: string, data: any, init: RequestInit = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+      ...authHeaders(),
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    let msg = `API error: ${res.status} ${res.statusText}`;
+    try {
+      const error = await res.json();
+      msg = error.error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export async function apiDelete(path: string, init: RequestInit = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',

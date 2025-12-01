@@ -8,7 +8,7 @@ import Navbar from '../../../components/Navbar';
 export default function PaymentSuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   const [verifying, setVerifying] = useState(true);
   const [paymentStatus, setPaymentStatus] = useState<any>(null);
   const [error, setError] = useState('');
@@ -18,8 +18,29 @@ export default function PaymentSuccessPage() {
   const status = searchParams.get('status');
 
   useEffect(() => {
-    if (tx_ref && token) {
-      verifyPayment();
+    // Wait for auth to initialize
+    if (authLoading) return;
+
+    // Check URL params first
+    let ref = tx_ref;
+    
+    // Fallback to localStorage
+    if (!ref) {
+      const storedRef = localStorage.getItem('pending_payment_ref');
+      if (storedRef) {
+        ref = storedRef;
+      }
+    }
+
+    if (ref) {
+      if (token) {
+        setError(''); // Clear any previous errors
+        setVerifying(true);
+        verifyPayment(ref);
+      } else {
+        setVerifying(false);
+        setError('Please log in to verify your payment.');
+      }
     } else if (status === 'success') {
       setVerifying(false);
       setPaymentStatus({ status: 'success' });
@@ -28,9 +49,9 @@ export default function PaymentSuccessPage() {
       setVerifying(false);
       setError('No payment information found. Please check your dashboard.');
     }
-  }, [tx_ref, token, status]);
+  }, [tx_ref, token, status, authLoading]);
 
-  const verifyPayment = async () => {
+  const verifyPayment = async (ref: string) => {
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
       
@@ -38,7 +59,7 @@ export default function PaymentSuccessPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-      const response = await fetch(`${apiBase}/payments/verify/${tx_ref}`, {
+      const response = await fetch(`${apiBase}/payments/verify/${ref}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         },
@@ -51,6 +72,7 @@ export default function PaymentSuccessPage() {
       
       if (data.success) {
         setPaymentStatus(data);
+        localStorage.removeItem('pending_payment_ref'); // Clear stored ref
       } else {
         setError('Payment verification failed');
       }
@@ -86,12 +108,21 @@ export default function PaymentSuccessPage() {
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h2>
               <p className="text-gray-600 mb-6">{error}</p>
-              <button
-                onClick={() => router.push('/products')}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                Back to Products
-              </button>
+              {error.includes('log in') ? (
+                <button
+                  onClick={() => router.push(`/login?redirect=/payment/success?tx_ref=${tx_ref}`)}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Log In to Verify
+                </button>
+              ) : (
+                <button
+                  onClick={() => router.push('/products')}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Back to Products
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-lg p-12 text-center">

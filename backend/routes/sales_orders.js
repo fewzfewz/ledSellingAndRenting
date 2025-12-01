@@ -128,4 +128,35 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
+// Update order status (admin only)
+router.put('/:id', verifyToken, async (req, res) => {
+  try {
+    // Check if admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['pending', 'paid', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const result = await pool.query(
+      'UPDATE sales_orders SET status = $1 WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
