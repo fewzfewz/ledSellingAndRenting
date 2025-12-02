@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { apiGet } from '../../../lib/api';
+import Navbar from '../../../components/Navbar';
 
 export default function AdminInventoryPage() {
   const { user } = useAuth();
@@ -13,6 +14,7 @@ export default function AdminInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -21,7 +23,7 @@ export default function AdminInventoryPage() {
     }
 
     fetchInventory();
-  }, [user, router, statusFilter, searchTerm]);
+  }, [user, router, statusFilter, searchTerm, typeFilter]);
 
   const fetchInventory = async () => {
     try {
@@ -29,6 +31,7 @@ export default function AdminInventoryPage() {
       const params = new URLSearchParams();
       if (statusFilter) params.append('status', statusFilter);
       if (searchTerm) params.append('search', searchTerm);
+      if (typeFilter) params.append('type', typeFilter);
       
       const data = await apiGet(`/admin/inventory?${params.toString()}`);
       setInventory(data);
@@ -39,162 +42,238 @@ export default function AdminInventoryPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      available: 'bg-green-100 text-green-800',
-      rented: 'bg-blue-100 text-blue-800',
-      maintenance: 'bg-yellow-100 text-yellow-800',
-      damaged: 'bg-red-100 text-red-800',
-      retired: 'bg-gray-100 text-gray-800'
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { bg: string; text: string; icon: string }> = {
+      available: { bg: 'bg-green-500/20', text: 'text-green-400', icon: '✓' },
+      rented: { bg: 'bg-blue-500/20', text: 'text-blue-400', icon: '🎬' },
+      maintenance: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', icon: '🔧' },
+      damaged: { bg: 'bg-red-500/20', text: 'text-red-400', icon: '⚠️' },
+      retired: { bg: 'bg-gray-500/20', text: 'text-gray-400', icon: '📦' }
     };
-
-    return (
-      <span className={`px-2 py-1 text-xs rounded-full font-medium ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
+    return configs[status] || { bg: 'bg-gray-500/20', text: 'text-gray-400', icon: '•' };
   };
 
   if (!user || user.role !== 'admin') {
     return null;
   }
 
+  // Group inventory by product and variant
+  const groupedInventory = inventory.reduce((acc, unit) => {
+    const key = `${unit.product_id}-${unit.variant_id}`;
+    if (!acc[key]) {
+      acc[key] = {
+        product_title: unit.product_title,
+        sku: unit.sku,
+        units: [],
+        totalCount: 0,
+        availableCount: 0,
+        rentedCount: 0
+      };
+    }
+    acc[key].units.push(unit);
+    acc[key].totalCount++;
+    if (unit.status === 'available') acc[key].availableCount++;
+    if (unit.status === 'rented') acc[key].rentedCount++;
+    return acc;
+  }, {} as Record<string, any>);
+
+  const stats = {
+    total: inventory.length,
+    available: inventory.filter(u => u.status === 'available').length,
+    rented: inventory.filter(u => u.status === 'rented').length,
+    maintenance: inventory.filter(u => u.status === 'maintenance').length,
+    damaged: inventory.filter(u => u.status === 'damaged').length
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+      <Navbar />
+      
+      {/* Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative container mx-auto px-4 py-8 pt-24">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
-            <p className="text-gray-600 mt-1">Manage LED screen inventory units</p>
+            <Link href="/admin/dashboard" className="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Dashboard
+            </Link>
+            <h1 className="text-4xl font-black mt-2">
+              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Inventory Management
+              </span>
+            </h1>
+            <p className="text-gray-400 mt-2">Track and manage LED screen inventory units</p>
           </div>
           <Link
             href="/admin/inventory/new"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium"
+            className="mt-4 md:mt-0 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-semibold hover:scale-105 transition-transform shadow-lg shadow-blue-500/50"
           >
-            + Add Inventory Unit
+            <span className="flex items-center gap-2">
+              ➕ Add Inventory
+            </span>
           </Link>
         </div>
 
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          {[
+            { label: 'Total Units', value: stats.total, icon: '📦', color: 'blue' },
+            { label: 'Available', value: stats.available, icon: '✓', color: 'green' },
+            { label: 'Rented', value: stats.rented, icon: '🎬', color: 'purple' },
+            { label: 'Maintenance', value: stats.maintenance, icon: '🔧', color: 'yellow' },
+            { label: 'Damaged', value: stats.damaged, icon: '⚠️', color: 'red' }
+          ].map((stat, idx) => (
+            <div key={idx} className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 bg-${stat.color}-500/20 rounded-lg`}>
+                  <span className="text-2xl">{stat.icon}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">{stat.label}</p>
+                  <p className={`text-2xl font-bold text-${stat.color}-400`}>{stat.value}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Search</label>
               <input
                 type="text"
                 placeholder="Search by serial number or product..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status Filter</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Status Filter</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:bg-white/10 focus:border-purple-500/50 transition-all outline-none cursor-pointer"
               >
-                <option value="">All Statuses</option>
-                <option value="available">Available</option>
-                <option value="rented">Rented</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="damaged">Damaged</option>
-                <option value="retired">Retired</option>
+                <option value="" className="bg-gray-900">All Statuses</option>
+                <option value="available" className="bg-gray-900">Available</option>
+                <option value="rented" className="bg-gray-900">Rented</option>
+                <option value="maintenance" className="bg-gray-900">Maintenance</option>
+                <option value="damaged" className="bg-gray-900">Damaged</option>
+                <option value="retired" className="bg-gray-900">Retired</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Type Filter</label>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:bg-white/10 focus:border-pink-500/50 transition-all outline-none cursor-pointer"
+              >
+                <option value="" className="bg-gray-900">All Types</option>
+                <option value="rental" className="bg-gray-900">Rental</option>
+                <option value="sale" className="bg-gray-900">Sale</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Inventory Table */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-gray-600">Loading inventory...</p>
+        {/* Inventory List */}
+        {loading ? (
+          <div className="text-center py-20">
+            <div className="inline-block relative">
+              <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
             </div>
-          ) : inventory.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No inventory units found.</p>
-              <Link
-                href="/admin/inventory/new"
-                className="text-blue-600 hover:text-blue-700 font-medium"
+            <p className="text-gray-400 mt-4">Loading inventory...</p>
+          </div>
+        ) : Object.keys(groupedInventory).length === 0 ? (
+          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-12 text-center">
+            <div className="text-6xl mb-4">📦</div>
+            <p className="text-xl text-gray-400 mb-2">No inventory units found</p>
+            <p className="text-gray-500 mb-6">Start by adding your first inventory unit</p>
+            <Link
+              href="/admin/inventory/new"
+              className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl font-semibold hover:scale-105 transition-transform"
+            >
+              Add Inventory Unit →
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {Object.entries(groupedInventory).map(([key, group]: [string, any], idx) => (
+              <div
+                key={key}
+                className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300"
               >
-                Add your first inventory unit →
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Serial Number
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Product
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      SKU
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {inventory.map((unit) => (
-                    <tr key={unit.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{unit.serial_number}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{unit.product_title}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{unit.sku}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(unit.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{unit.location || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button className="text-blue-600 hover:text-blue-700 mr-3">
-                          Edit
-                        </button>
-                        <button className="text-gray-600 hover:text-gray-700">
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                <div className="p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl">
+                        <span className="text-2xl">📺</span>
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white mb-1">{group.product_title}</h3>
+                        <p className="text-sm text-gray-400">SKU: {group.sku}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="text-center px-4 py-2 bg-white/5 rounded-xl">
+                        <p className="text-xs text-gray-400">Total</p>
+                        <p className="text-2xl font-bold text-white">{group.totalCount}</p>
+                      </div>
+                      <div className="text-center px-4 py-2 bg-green-500/10 rounded-xl border border-green-500/20">
+                        <p className="text-xs text-green-400">Available</p>
+                        <p className="text-2xl font-bold text-green-400">{group.availableCount}</p>
+                      </div>
+                      <div className="text-center px-4 py-2 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                        <p className="text-xs text-blue-400">Rented</p>
+                        <p className="text-2xl font-bold text-blue-400">{group.rentedCount}</p>
+                      </div>
+                    </div>
+                  </div>
 
-        {/* Summary Stats */}
-        {!loading && inventory.length > 0 && (
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
-            {['available', 'rented', 'maintenance', 'damaged', 'retired'].map((status) => {
-              const count = inventory.filter((u) => u.status === status).length;
-              return (
-                <div key={status} className="bg-white rounded-lg shadow-sm p-4">
-                  <p className="text-sm text-gray-600 capitalize">{status}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
+                  {/* Units List */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                    {group.units.map((unit: any) => {
+                      const statusConfig = getStatusConfig(unit.status);
+                      return (
+                        <div key={unit.id} className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="text-xs text-gray-500 font-mono">{unit.serial_number}</p>
+                              <p className="text-xs text-gray-400 mt-1">{unit.location || 'No location'}</p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${statusConfig.bg} ${statusConfig.text} border border-current/30`}>
+                              {statusConfig.icon} {unit.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-3">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              unit.inventory_type === 'rental' 
+                                ? 'bg-purple-500/20 text-purple-400' 
+                                : 'bg-green-500/20 text-green-400'
+                            }`}>
+                              {unit.inventory_type === 'rental' ? '🎬 Rental' : '💰 Sale'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>

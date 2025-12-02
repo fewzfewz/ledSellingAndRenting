@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { cartCount } = useCart();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -82,36 +84,38 @@ export default function Navbar() {
 
           {/* Right Section */}
           <div className="flex items-center space-x-4">
-            {/* Shopping Cart */}
-            <Link href="/cart" className="group relative">
-              <div className={`relative p-3 rounded-xl transition-all duration-300 ${
-                cartCount > 0 
-                  ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30' 
-                  : 'bg-white/5 hover:bg-white/10'
-              }`}>
-                <svg 
-                  className="w-6 h-6 text-gray-300 group-hover:text-white transition-colors" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
-                  />
-                </svg>
-                {cartCount > 0 && (
-                  <>
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-lg shadow-pink-500/50 animate-pulse">
-                      {cartCount}
-                    </span>
-                    <span className="absolute -top-1 -right-1 bg-pink-500 rounded-full h-6 w-6 animate-ping opacity-75"></span>
-                  </>
-                )}
-              </div>
-            </Link>
+            {/* Shopping Cart - Hidden for Admins */}
+            {user?.role !== 'admin' && (
+              <Link href="/cart" className="group relative">
+                <div className={`relative p-3 rounded-xl transition-all duration-300 ${
+                  cartCount > 0 
+                    ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30' 
+                    : 'bg-white/5 hover:bg-white/10'
+                }`}>
+                  <svg 
+                    className="w-6 h-6 text-gray-300 group-hover:text-white transition-colors" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
+                    />
+                  </svg>
+                  {cartCount > 0 && (
+                    <>
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-lg shadow-pink-500/50 animate-pulse">
+                        {cartCount}
+                      </span>
+                      <span className="absolute -top-1 -right-1 bg-pink-500 rounded-full h-6 w-6 animate-ping opacity-75"></span>
+                    </>
+                  )}
+                </div>
+              </Link>
+            )}
 
             {/* User Section */}
             {user ? (
@@ -158,6 +162,23 @@ export default function Navbar() {
               </div>
             )}
 
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -176,8 +197,8 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-white/10 animate-fadeIn">
-            <div className="flex flex-col space-y-2">
+          <div className="md:hidden absolute top-20 left-0 w-full bg-gray-900/95 backdrop-blur-lg border-b border-white/10 shadow-xl animate-fadeIn">
+            <div className="flex flex-col space-y-2 p-4">
               {[...navLinks, ...adminLinks].map((link) => (
                 <Link
                   key={link.href}
@@ -201,6 +222,28 @@ export default function Navbar() {
                   Dashboard
                 </Link>
               )}
+              
+              {/* Theme Toggle in Mobile Menu */}
+              <button
+                onClick={toggleTheme}
+                className="px-4 py-3 rounded-lg font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-3"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <span>Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                    <span>Dark Mode</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         )}

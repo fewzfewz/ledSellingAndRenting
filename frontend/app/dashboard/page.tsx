@@ -22,6 +22,11 @@ export default function DashboardPage() {
       return;
     }
 
+    if (user.role === 'admin') {
+      router.push('/admin/dashboard');
+      return;
+    }
+
     fetchData();
   }, [user, router, authLoading]);
 
@@ -131,29 +136,40 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-black text-gray-900 dark:text-white transition-colors duration-300">
       <Navbar />
-      <div className="container mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold mb-8">My Dashboard</h1>
+      
+      {/* Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative container mx-auto px-4 py-12 pt-24">
+        <h1 className="text-4xl font-black mb-8">
+          <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+            My Dashboard
+          </span>
+        </h1>
 
         {/* Tabs */}
-        <div className="flex space-x-4 mb-6 border-b">
+        <div className="flex space-x-4 mb-8 border-b border-gray-200 dark:border-white/10">
           <button
             onClick={() => setActiveTab('rentals')}
-            className={`pb-3 px-4 font-medium transition-colors ${
+            className={`pb-3 px-4 font-medium transition-all ${
               activeTab === 'rentals'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             My Rentals ({rentals.length})
           </button>
           <button
             onClick={() => setActiveTab('orders')}
-            className={`pb-3 px-4 font-medium transition-colors ${
+            className={`pb-3 px-4 font-medium transition-all ${
               activeTab === 'orders'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             My Orders ({orders.length})
@@ -161,19 +177,22 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="text-center py-20">
+            <div className="inline-block relative">
+              <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+            </div>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">Loading your activity...</p>
           </div>
         ) : (
           <>
             {/* Rentals Tab */}
             {activeTab === 'rentals' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {rentals.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                    <p className="text-gray-500 mb-4">You haven't made any rental bookings yet.</p>
-                    <a href="/products" className="text-blue-600 hover:text-blue-700 font-medium">
+                  <div className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-12 text-center shadow-xl dark:shadow-none transition-colors duration-300">
+                    <div className="text-6xl mb-4">📺</div>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">You haven't made any rental bookings yet.</p>
+                    <a href="/products" className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-blue-500/20">
                       Browse LED Screens →
                     </a>
                   </div>
@@ -183,27 +202,32 @@ export default function DashboardPage() {
                     const isActive = rental.status === 'active';
                     
                     return (
-                      <div key={rental.id} className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
-                        <div className="flex justify-between items-start mb-4">
+                      <div key={rental.id} className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-6 hover:border-blue-300 dark:hover:border-white/20 transition-all group shadow-lg dark:shadow-none">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              Rental #{rental.id.slice(0, 8)}
-                            </h3>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                Rental #{rental.id.slice(0, 8)}
+                              </h3>
+                              {getStatusBadge(rental.status)}
+                            </div>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">
                               {formatDate(rental.start_date)} - {formatDate(rental.end_date)}
                             </p>
                             {isActive && (
-                              <p className={`text-sm font-bold mt-1 ${daysLeft < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              <p className={`text-sm font-bold mt-2 ${daysLeft < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                                 {daysLeft < 0 ? `Overdue by ${Math.abs(daysLeft)} days` : `${daysLeft} days remaining`}
                               </p>
                             )}
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            {getStatusBadge(rental.status)}
+                          <div className="flex flex-col items-end gap-3">
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                              ${rental.total_amount}
+                            </p>
                             {rental.status === 'confirmed' && (
                               <button 
                                 onClick={() => handleConfirmReceipt(rental.id, 'rental')}
-                                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                                className="text-sm bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30 px-4 py-2 rounded-lg hover:bg-green-200 dark:hover:bg-green-500/30 transition-colors"
                               >
                                 Confirm Receipt
                               </button>
@@ -212,19 +236,16 @@ export default function DashboardPage() {
                         </div>
                         
                         {/* Delivery Progress */}
-                        {getDeliveryProgress(rental.status, 'rental')}
+                        <div className="bg-gray-100 dark:bg-black/20 rounded-xl p-4 mb-4">
+                          {getDeliveryProgress(rental.status, 'rental')}
+                        </div>
                         
-                        <div className="flex justify-between items-center mt-4">
-                          <div>
-                            <p className="text-sm text-gray-600">
-                              Total Amount: <span className="font-semibold text-gray-900">${rental.total_amount}</span>
-                            </p>
-                          </div>
+                        <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-white/10">
                           <button
                             onClick={() => router.push(`/rentals/${rental.id}`)}
-                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-2 group-hover:translate-x-1 transition-transform"
                           >
-                            View Details →
+                            View Details <span className="text-lg">→</span>
                           </button>
                         </div>
                       </div>
@@ -236,32 +257,38 @@ export default function DashboardPage() {
 
             {/* Orders Tab */}
             {activeTab === 'orders' && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {orders.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                    <p className="text-gray-500 mb-4">You haven't placed any orders yet.</p>
-                    <a href="/products" className="text-blue-600 hover:text-blue-700 font-medium">
+                  <div className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-12 text-center shadow-xl dark:shadow-none transition-colors duration-300">
+                    <div className="text-6xl mb-4">🛒</div>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">You haven't placed any orders yet.</p>
+                    <a href="/products" className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-blue-500/20">
                       Browse LED Screens →
                     </a>
                   </div>
                 ) : (
                   orders.map((order) => (
-                    <div key={order.id} className="bg-white rounded-xl shadow-sm p-6">
-                      <div className="flex justify-between items-start mb-4">
+                    <div key={order.id} className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-6 hover:border-blue-300 dark:hover:border-white/20 transition-all group shadow-lg dark:shadow-none">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            Order #{order.id.slice(0, 8)}
-                          </h3>
-                          <p className="text-sm text-gray-500 mt-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                              Order #{order.id.slice(0, 8)}
+                            </h3>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          <p className="text-gray-500 dark:text-gray-400 text-sm">
                             Placed on {formatDate(order.created_at)}
                           </p>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          {getStatusBadge(order.status)}
+                        <div className="flex flex-col items-end gap-3">
+                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                            ${order.total_amount}
+                          </p>
                           {order.status === 'shipped' && (
                             <button 
                               onClick={() => handleConfirmReceipt(order.id, 'order')}
-                              className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                              className="text-sm bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30 px-4 py-2 rounded-lg hover:bg-green-200 dark:hover:bg-green-500/30 transition-colors"
                             >
                               Confirm Delivery
                             </button>
@@ -270,19 +297,16 @@ export default function DashboardPage() {
                       </div>
                       
                       {/* Delivery Progress */}
-                      {getDeliveryProgress(order.status, 'order')}
+                      <div className="bg-gray-100 dark:bg-black/20 rounded-xl p-4 mb-4">
+                        {getDeliveryProgress(order.status, 'order')}
+                      </div>
                       
-                      <div className="flex justify-between items-center mt-4">
-                        <div>
-                          <p className="text-sm text-gray-600">
-                            Total Amount: <span className="font-semibold text-gray-900">${order.total_amount}</span>
-                          </p>
-                        </div>
+                      <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-white/10">
                         <button
                           onClick={() => router.push(`/orders/${order.id}`)}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-2 group-hover:translate-x-1 transition-transform"
                         >
-                          View Details →
+                          View Details <span className="text-lg">→</span>
                         </button>
                       </div>
                     </div>

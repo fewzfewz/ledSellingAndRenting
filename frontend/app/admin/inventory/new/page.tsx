@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { apiGet, apiPost } from '../../../../lib/api';
+import Navbar from '../../../../components/Navbar';
 
 export default function AddInventoryPage() {
   const { user } = useAuth();
@@ -13,6 +15,7 @@ export default function AddInventoryPage() {
   const [loading, setLoading] = useState(false);
   
   const [isNewProduct, setIsNewProduct] = useState(false);
+  const [addMultiple, setAddMultiple] = useState(false);
   
   const [formData, setFormData] = useState({
     // Existing product fields
@@ -32,7 +35,9 @@ export default function AddInventoryPage() {
     rent_price_per_day: '',
 
     // Common fields
+    quantity: '1',
     serial_number: '',
+    serial_number_prefix: '',
     status: 'available',
     location: '',
     inventory_type: 'rental' as 'rental' | 'sale'
@@ -78,9 +83,16 @@ export default function AddInventoryPage() {
     e.preventDefault();
     
     // Validation
-    if (!formData.serial_number) {
-      alert('Serial Number is required');
-      return;
+    if (addMultiple) {
+      if (!formData.serial_number_prefix || !formData.quantity) {
+        alert('Serial Number Prefix and Quantity are required for bulk addition');
+        return;
+      }
+    } else {
+      if (!formData.serial_number) {
+        alert('Serial Number is required');
+        return;
+      }
     }
 
     if (isNewProduct) {
@@ -100,7 +112,9 @@ export default function AddInventoryPage() {
       
       const payload = {
         is_new_product: isNewProduct,
-        serial_number: formData.serial_number,
+        quantity: addMultiple ? parseInt(formData.quantity) : 1,
+        serial_number: !addMultiple ? formData.serial_number : undefined,
+        serial_number_prefix: addMultiple ? formData.serial_number_prefix : undefined,
         status: formData.status,
         location: formData.location || null,
         inventory_type: formData.inventory_type,
@@ -123,7 +137,7 @@ export default function AddInventoryPage() {
 
       await apiPost('/admin/inventory', payload);
 
-      alert('Inventory unit added successfully!');
+      alert(addMultiple ? `Successfully added ${formData.quantity} units!` : 'Inventory unit added successfully!');
       router.push('/admin/inventory');
     } catch (err: any) {
       console.error('Failed to add inventory:', err);
@@ -138,322 +152,340 @@ export default function AddInventoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+      <Navbar />
+      
+      {/* Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative container mx-auto px-4 py-8 pt-24">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin/inventory')}
-            className="text-blue-600 hover:text-blue-700 mb-4 flex items-center"
-          >
-            ← Back to Inventory
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Add Inventory Unit</h1>
-          <p className="text-gray-600 mt-1">Add a new LED screen unit to the inventory</p>
+          <Link href="/admin/inventory" className="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Inventory
+          </Link>
+          <h1 className="text-4xl font-black mt-2">
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Add Inventory
+            </span>
+          </h1>
+          <p className="text-gray-400 mt-2">Add new units to your inventory tracking system</p>
         </div>
 
-        {/* Form */}
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-2xl">
-          
-          {/* Toggle Mode */}
-          <div className="flex p-1 bg-gray-100 rounded-lg mb-8">
-            <button
-              type="button"
-              onClick={() => setIsNewProduct(false)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                !isNewProduct ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Add to Existing Product
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsNewProduct(true)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                isNewProduct ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Create New Product
-            </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Form */}
+          <div className="lg:col-span-2">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Product Selection Card */}
+              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <span className="text-2xl">📦</span>
+                  Product Details
+                </h3>
+
+                {/* Mode Toggle */}
+                <div className="flex p-1 bg-black/20 rounded-xl mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewProduct(false)}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                      !isNewProduct ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Existing Product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewProduct(true)}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                      isNewProduct ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Create New Product
+                  </button>
+                </div>
+
+                {!isNewProduct ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Select Product</label>
+                      <select
+                        value={formData.product_id}
+                        onChange={(e) => handleProductChange(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none cursor-pointer"
+                        required={!isNewProduct}
+                      >
+                        <option value="" className="bg-gray-900">Select a product...</option>
+                        {products.map((product) => (
+                          <option key={product.id} value={product.id} className="bg-gray-900">
+                            {product.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Select Variant</label>
+                      <select
+                        value={formData.variant_id}
+                        onChange={(e) => setFormData({ ...formData, variant_id: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none cursor-pointer disabled:opacity-50"
+                        required={!isNewProduct}
+                        disabled={!formData.product_id}
+                      >
+                        <option value="" className="bg-gray-900">Select a variant...</option>
+                        {variants.map((variant) => (
+                          <option key={variant.id} value={variant.id} className="bg-gray-900">
+                            {variant.sku} - ${variant.base_price}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Product Title</label>
+                      <input
+                        type="text"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                        placeholder="e.g. P2.6 Indoor Poster Screen"
+                        required={isNewProduct}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">SKU</label>
+                        <input
+                          type="text"
+                          value={formData.sku}
+                          onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                          placeholder="e.g. P2.6-IN"
+                          required={isNewProduct}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+                        <select
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none cursor-pointer"
+                        >
+                          <option value="Indoor" className="bg-gray-900">Indoor</option>
+                          <option value="Outdoor" className="bg-gray-900">Outdoor</option>
+                          <option value="Rental" className="bg-gray-900">Rental</option>
+                          <option value="Fixed" className="bg-gray-900">Fixed</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Base Price ($)</label>
+                      <input
+                        type="number"
+                        value={formData.base_price}
+                        onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                        required={isNewProduct}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Inventory Details Card */}
+              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <span className="text-2xl">🔢</span>
+                  Inventory Details
+                </h3>
+
+                {/* Bulk Add Toggle */}
+                <div className="flex items-center gap-3 mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+                  <div className={`w-12 h-6 rounded-full p-1 transition-colors cursor-pointer ${addMultiple ? 'bg-blue-600' : 'bg-gray-600'}`} onClick={() => setAddMultiple(!addMultiple)}>
+                    <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform ${addMultiple ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="font-medium text-gray-300">Add Multiple Units</span>
+                </div>
+
+                <div className="space-y-4">
+                  {addMultiple ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Quantity</label>
+                        <input
+                          type="number"
+                          value={formData.quantity}
+                          onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                          min="2"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Serial Prefix</label>
+                        <input
+                          type="text"
+                          value={formData.serial_number_prefix}
+                          onChange={(e) => setFormData({ ...formData, serial_number_prefix: e.target.value })}
+                          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                          placeholder="e.g. LED-2024"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Will generate: LED-2024-1, LED-2024-2...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Serial Number</label>
+                      <input
+                        type="text"
+                        value={formData.serial_number}
+                        onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                        placeholder="e.g. LED-001-2024"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
+                      <select
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none cursor-pointer"
+                      >
+                        <option value="available" className="bg-gray-900">Available</option>
+                        <option value="rented" className="bg-gray-900">Rented</option>
+                        <option value="maintenance" className="bg-gray-900">Maintenance</option>
+                        <option value="damaged" className="bg-gray-900">Damaged</option>
+                        <option value="retired" className="bg-gray-900">Retired</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                      <input
+                        type="text"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:bg-white/10 focus:border-blue-500/50 transition-all outline-none"
+                        placeholder="e.g. Warehouse A"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Inventory Type</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <label className={`cursor-pointer p-4 rounded-xl border transition-all ${
+                        formData.inventory_type === 'rental' 
+                          ? 'bg-blue-500/20 border-blue-500/50' 
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="inventory_type"
+                            value="rental"
+                            checked={formData.inventory_type === 'rental'}
+                            onChange={() => setFormData({ ...formData, inventory_type: 'rental' })}
+                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 bg-gray-900 border-gray-600"
+                          />
+                          <div>
+                            <p className="font-medium text-white">For Rental</p>
+                            <p className="text-xs text-gray-400">Recurring revenue</p>
+                          </div>
+                        </div>
+                      </label>
+                      <label className={`cursor-pointer p-4 rounded-xl border transition-all ${
+                        formData.inventory_type === 'sale' 
+                          ? 'bg-green-500/20 border-green-500/50' 
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="inventory_type"
+                            value="sale"
+                            checked={formData.inventory_type === 'sale'}
+                            onChange={() => setFormData({ ...formData, inventory_type: 'sale' })}
+                            className="w-4 h-4 text-green-600 focus:ring-green-500 bg-gray-900 border-gray-600"
+                          />
+                          <div>
+                            <p className="font-medium text-white">For Sale</p>
+                            <p className="text-xs text-gray-400">One-time purchase</p>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex gap-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    addMultiple ? `Add ${formData.quantity} Units` : 'Add Inventory Unit'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push('/admin/inventory')}
+                  className="px-8 py-4 bg-white/5 text-gray-300 rounded-xl font-semibold hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {!isNewProduct ? (
-              /* Existing Product Selection */
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.product_id}
-                    onChange={(e) => handleProductChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required={!isNewProduct}
-                  >
-                    <option value="">Select a product</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Variant <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.variant_id}
-                    onChange={(e) => setFormData({ ...formData, variant_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required={!isNewProduct}
-                    disabled={!formData.product_id}
-                  >
-                    <option value="">Select a variant</option>
-                    {variants.map((variant) => (
-                      <option key={variant.id} value={variant.id}>
-                        {variant.sku} - ${variant.base_price}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            ) : (
-              /* New Product Fields */
-              <div className="space-y-4 border-b border-gray-200 pb-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">New Product Details</h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    placeholder="e.g. P2.6 Indoor Poster Screen"
-                    required={isNewProduct}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="e.g. P2.6-IN"
-                      required={isNewProduct}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="Indoor">Indoor</option>
-                      <option value="Outdoor">Outdoor</option>
-                      <option value="Rental">Rental</option>
-                      <option value="Fixed">Fixed</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Price ($) <span className="text-red-500">*</span></label>
-                  <input
-                    type="number"
-                    value={formData.base_price}
-                    onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    required={isNewProduct}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
-                  <input
-                    type="url"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Pixel Pitch (mm)</label>
-                    <input
-                      type="text"
-                      value={formData.pixel_pitch}
-                      onChange={(e) => setFormData({ ...formData, pixel_pitch: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="2.6"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Width (cm)</label>
-                    <input
-                      type="text"
-                      value={formData.width_cm}
-                      onChange={(e) => setFormData({ ...formData, width_cm: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
-                    <input
-                      type="text"
-                      value={formData.height_cm}
-                      onChange={(e) => setFormData({ ...formData, height_cm: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="100"
-                    />
-                  </div>
-                </div>
-
-                {/* Rental Price - Highlighted if rental type selected */}
-                <div className={`transition-all duration-300 ${formData.inventory_type === 'rental' ? 'bg-blue-50 p-4 rounded-lg border border-blue-100' : ''}`}>
-                  <label className={`block text-sm font-medium mb-1 ${formData.inventory_type === 'rental' ? 'text-blue-800' : 'text-gray-700'}`}>
-                    Rental Price / Day ($)
-                    {formData.inventory_type === 'rental' && <span className="ml-2 text-xs font-normal text-blue-600">(Recommended for rentals)</span>}
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.rent_price_per_day}
-                    onChange={(e) => setFormData({ ...formData, rent_price_per_day: e.target.value })}
-                    className={`w-full px-4 py-2 border rounded-lg ${formData.inventory_type === 'rental' ? 'border-blue-300 focus:ring-blue-500' : 'border-gray-300'}`}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Common Fields */}
-            <div className="pt-4 border-t border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Inventory Details</h3>
-              
-              {/* Serial Number */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Serial Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.serial_number}
-                  onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., LED-001-2024"
-                  required
-                />
-              </div>
-
-              {/* Status */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="available">Available</option>
-                  <option value="rented">Rented</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="damaged">Damaged</option>
-                  <option value="retired">Retired</option>
-                </select>
-              </div>
-
-              {/* Inventory Type */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Inventory Type <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="inventory_type"
-                      value="rental"
-                      checked={formData.inventory_type === 'rental'}
-                      onChange={(e) => setFormData({ ...formData, inventory_type: 'rental' })}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">For Rental</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="inventory_type"
-                      value="sale"
-                      checked={formData.inventory_type === 'sale'}
-                      onChange={(e) => setFormData({ ...formData, inventory_type: 'sale' })}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">For Sale</span>
-                  </label>
-                </div>
-                <p className="text-sm text-gray-500 mt-2">⚠️ This cannot be changed after creation</p>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., Warehouse A, Shelf 3"
-                />
-              </div>
+          {/* Sidebar Info */}
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/5 backdrop-blur-lg rounded-2xl border border-blue-500/20 p-6">
+              <h4 className="text-lg font-bold text-white mb-4">Quick Tips</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li className="flex gap-2">
+                  <span className="text-blue-400">•</span>
+                  Use "Add Multiple Units" for bulk stock updates
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-blue-400">•</span>
+                  Serial prefixes automatically number units (e.g. LED-1, LED-2)
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-blue-400">•</span>
+                  Rental units track daily rates and availability
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-blue-400">•</span>
+                  Sale units are removed from inventory after purchase
+                </li>
+              </ul>
             </div>
-
-            {/* Submit Button */}
-            <div className="flex gap-4 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Adding...' : (isNewProduct ? 'Create Product & Add Unit' : 'Add Inventory Unit')}
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push('/admin/inventory')}
-                className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>

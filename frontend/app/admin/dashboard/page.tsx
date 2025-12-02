@@ -98,7 +98,7 @@ export default function AdminDashboard() {
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative container mx-auto px-4 py-8">
+      <div className="relative container mx-auto px-4 py-8 pt-24">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 pb-6 border-b border-white/10">
           <div>
@@ -121,17 +121,25 @@ export default function AdminDashboard() {
 
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {/* Revenue Card */}
-          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
+          {/* Revenue Card - Clickable */}
+          <Link href="/admin/analytics/revenue" className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02] cursor-pointer">
             <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <div className="relative z-10">
               <div className="flex justify-between items-start mb-4">
                 <div className="p-3 bg-green-500/20 rounded-xl">
                   <span className="text-2xl">💰</span>
                 </div>
-                <span className="text-xs font-medium px-2 py-1 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20">
-                  +12% vs last month
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs font-medium px-2 py-1 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20">
+                    +12% vs last month
+                  </span>
+                  <span className="text-xs font-medium px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20 flex items-center gap-1">
+                    View Analytics
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
               </div>
               <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
               <h3 className="text-3xl font-bold text-white mb-2">
@@ -143,7 +151,7 @@ export default function AdminDashboard() {
                 <span>Sales: ${stats?.salesRevenue?.toLocaleString()}</span>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Products Card */}
           <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
