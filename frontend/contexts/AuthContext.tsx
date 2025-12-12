@@ -22,36 +22,48 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('token');
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored token on mount
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-      // Fetch user data
-      fetch('http://localhost:4000/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${storedToken}`
+    // If there's no token we can stop loading
+    if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+
+    // Fetch user data
+    let cancelled = false;
+
+    fetch('http://localhost:4000/api/auth/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.id) {
+          setUser(data);
+        } else {
+          localStorage.removeItem('token');
+          setToken(null);
         }
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.id) {
-            setUser(data);
-          } else {
-            localStorage.removeItem('token');
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
+      .catch(() => {
+        localStorage.removeItem('token');
+        setToken(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [token]);
 
   const login = async (email: string, password: string) => {
     const res = await fetch('http://localhost:4000/api/auth/login', {

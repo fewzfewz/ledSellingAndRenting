@@ -437,4 +437,74 @@ router.delete('/users/:id', verifyToken, requireRole('admin'), async (req, res) 
   }
 });
 
+// ==========================
+// Admin Chat Routes
+// ==========================
+
+// Get all client chat messages
+router.get('/chats', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c.message,
+        c.reply,
+        c.created_at,
+        u.name AS userName
+      FROM chats c
+      JOIN users u ON c.user_id = u.id
+      ORDER BY c.created_at DESC
+    `);
+
+    res.json({ chats: result.rows });
+  } catch (err) {
+    console.error("Error fetching chats:", err);
+    res.status(500).json({ error: "Server error fetching chats" });
+  }
+});
+
+// Reply to a chat message
+router.post('/chats/:id/reply', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reply } = req.body;
+
+    if (!reply) {
+      return res.status(400).json({ error: "Reply message is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE chats 
+       SET reply = $1 
+       WHERE id = $2 
+       RETURNING *`,
+      [reply, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Chat message not found" });
+    }
+
+    res.json({ chat: result.rows[0] });
+  } catch (err) {
+    console.error("Error sending reply:", err);
+    res.status(500).json({ error: "Server error sending reply" });
+  }
+});
+
+// Mark all messages for a user as read (admin)
+router.post('/chats/mark-read', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    await pool.query('UPDATE chats SET is_read = true WHERE user_id = $1', [userId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
 module.exports = router;

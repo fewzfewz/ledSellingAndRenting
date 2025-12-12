@@ -105,8 +105,12 @@ export default function PaymentCheckout({
       if (onSuccess) {
         onSuccess();
       }
-    } catch (err: any) {
-      setError(err.message || 'Payment failed');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'Payment failed');
+      } else {
+        setError('Payment failed');
+      }
       setLoading(false);
     }
   };

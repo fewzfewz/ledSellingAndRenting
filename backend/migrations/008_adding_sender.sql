@@ -1,0 +1,2 @@
+ALTER TABLE chats
+ADD COLUMN sender VARCHAR(50) DEFAULT 'user';

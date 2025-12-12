@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../contexts/AuthContext';
-import Navbar from '../../../components/Navbar';
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../../contexts/AuthContext";
+import Navbar from "../../../components/Navbar";
+import { apiGet, apiPost } from "../../../lib/api";
 
 interface DashboardStats {
   totalUsers: number;
@@ -17,43 +18,104 @@ interface DashboardStats {
   inventoryStatus: Record<string, number>;
 }
 
+interface ChatMessage {
+  id: string;
+  userName: string;
+  message: string;
+  reply?: string;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(
+    null
+  );
+  const [replyMessage, setReplyMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [chatLoading, setChatLoading] = useState(true);
+
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Redirect non-admin users
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) {
-      router.push('/login');
+    if (!authLoading && (!user || user.role !== "admin")) {
+      router.push("/login");
       return;
     }
-
     if (user && token) {
       fetchDashboardData();
+      fetchChats();
     }
-  }, [user, token, authLoading, router]);
+  }, [user, token, authLoading]);
+
+  // Poll chats every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchChats, 3000);
+    return () => clearInterval(interval);
+  }, [user, token]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   const fetchDashboardData = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/admin/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.details || 'Failed to fetch dashboard data');
-      }
-
-      const data = await res.json();
+      const data = await apiGet<{ stats: DashboardStats }>("/admin/dashboard");
       setStats(data.stats);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchChats = async () => {
+    try {
+      setChatLoading(true);
+      const data = await apiGet<{ chats: ChatMessage[] }>("/admin/chats");
+      setChatMessages(data.chats || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sendReply = async () => {
+    if (!replyMessage.trim() || !selectedMessage) return;
+
+    const msg = replyMessage;
+    setReplyMessage("");
+
+    // Optimistic UI
+    const tempReply: ChatMessage = {
+      ...selectedMessage,
+      reply: msg,
+      id: "temp-" + Date.now(),
+      created_at: new Date().toISOString(),
+    };
+    setChatMessages((prev) =>
+      prev.map((m) => (m.id === selectedMessage.id ? tempReply : m))
+    );
+
+    try {
+      const data = await apiPost<{ chat: ChatMessage }>(
+        `/admin/chats/${selectedMessage.id}/reply`,
+        { reply: msg }
+      );
+      setChatMessages((prev) =>
+        prev.map((m) => (m.id === data.chat.id ? data.chat : m))
+      );
+      setSelectedMessage(null);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -62,27 +124,10 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="relative">
           <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-          <div className="absolute inset-0 w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900">
-        <Navbar />
-        <div className="container mx-auto px-4 py-12">
-          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-6 py-4 rounded-xl backdrop-blur-sm">
-            <h3 className="text-lg font-bold mb-2">Error Loading Dashboard</h3>
-            <p>{error}</p>
-            <button 
-              onClick={fetchDashboardData}
-              className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
+          <div
+            className="absolute inset-0 w-16 h-16 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"
+            style={{ animationDirection: "reverse", animationDuration: "1.5s" }}
+          ></div>
         </div>
       </div>
     );
@@ -91,11 +136,11 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <Navbar />
-      
+
       {/* Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
       <div className="relative container mx-auto px-4 py-8 pt-24">
@@ -108,112 +153,43 @@ export default function AdminDashboard() {
               </span>
             </h1>
             <p className="text-gray-400">
-              Welcome back, <span className="text-white font-semibold">{user?.name || 'Admin'}</span>
+              Welcome back,{" "}
+              <span className="text-white font-semibold">
+                {user?.name || "Admin"}
+              </span>
             </p>
           </div>
-          <div className="text-right mt-4 md:mt-0">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-sm text-gray-300">System Online</span>
-            </div>
-          </div>
         </div>
 
-        {/* Key Metrics Grid */}
+        {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {/* Revenue Card - Clickable */}
-          <Link href="/admin/analytics/revenue" className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02] cursor-pointer">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-green-500/20 rounded-xl">
-                  <span className="text-2xl">💰</span>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs font-medium px-2 py-1 bg-green-500/10 text-green-400 rounded-lg border border-green-500/20">
-                    +12% vs last month
-                  </span>
-                  <span className="text-xs font-medium px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20 flex items-center gap-1">
-                    View Analytics
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
-                </div>
-              </div>
-              <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
-              <h3 className="text-3xl font-bold text-white mb-2">
-                ${stats?.totalRevenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
-              </h3>
-              <div className="flex gap-2 text-xs text-gray-500">
-                <span>Rent: ${stats?.rentalRevenue?.toLocaleString()}</span>
-                <span>•</span>
-                <span>Sales: ${stats?.salesRevenue?.toLocaleString()}</span>
-              </div>
-            </div>
-          </Link>
-
-          {/* Products Card */}
-          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-blue-500/20 rounded-xl">
-                  <span className="text-2xl">📦</span>
-                </div>
-                <Link href="/products" className="text-xs font-medium px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
-                  View All
-                </Link>
-              </div>
-              <p className="text-gray-400 text-sm mb-1">Total Products</p>
-              <h3 className="text-3xl font-bold text-white mb-2">
-                {stats?.totalProducts || 0}
-              </h3>
-              <p className="text-xs text-gray-500">Active catalog items</p>
-            </div>
+          <div className="p-6 bg-gradient-to-br from-green-500/20 to-emerald-500/10 rounded-2xl border border-white/10">
+            <p className="text-gray-400 text-sm mb-1">Total Revenue</p>
+            <h3 className="text-3xl font-bold text-white">
+              ${stats?.totalRevenue.toLocaleString() || "0.00"}
+            </h3>
           </div>
-
-          {/* Rentals Card */}
-          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-purple-500/20 rounded-xl">
-                  <span className="text-2xl">🎬</span>
-                </div>
-                <Link href="/admin/orders" className="text-xs font-medium px-2 py-1 bg-purple-500/10 text-purple-400 rounded-lg border border-purple-500/20 hover:bg-purple-500/20 transition-colors">
-                  Manage
-                </Link>
-              </div>
-              <p className="text-gray-400 text-sm mb-1">Total Rentals</p>
-              <h3 className="text-3xl font-bold text-white mb-2">
-                {stats?.totalRentals || 0}
-              </h3>
-              <p className="text-xs text-gray-500">Lifetime bookings</p>
-            </div>
+          <div className="p-6 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 rounded-2xl border border-white/10">
+            <p className="text-gray-400 text-sm mb-1">Total Products</p>
+            <h3 className="text-3xl font-bold text-white">
+              {stats?.totalProducts}
+            </h3>
           </div>
-
-          {/* Users Card */}
-          <div className="group relative p-6 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.02]">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-orange-500/20 rounded-xl">
-                  <span className="text-2xl">👥</span>
-                </div>
-                <span className="text-xs font-medium px-2 py-1 bg-orange-500/10 text-orange-400 rounded-lg border border-orange-500/20">
-                  Active
-                </span>
-              </div>
-              <p className="text-gray-400 text-sm mb-1">Total Users</p>
-              <h3 className="text-3xl font-bold text-white mb-2">
-                {stats?.totalUsers || 0}
-              </h3>
-              <p className="text-xs text-gray-500">Registered accounts</p>
-            </div>
+          <div className="p-6 bg-gradient-to-br from-purple-500/20 to-pink-500/10 rounded-2xl border border-white/10">
+            <p className="text-gray-400 text-sm mb-1">Total Rentals</p>
+            <h3 className="text-3xl font-bold text-white">
+              {stats?.totalRentals}
+            </h3>
+          </div>
+          <div className="p-6 bg-gradient-to-br from-orange-500/20 to-red-500/10 rounded-2xl border border-white/10">
+            <p className="text-gray-400 text-sm mb-1">Total Users</p>
+            <h3 className="text-3xl font-bold text-white">
+              {stats?.totalUsers}
+            </h3>
           </div>
         </div>
 
+        {/* Quick Actions & Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
           {/* Quick Actions */}
           <div className="lg:col-span-2">
@@ -223,18 +199,18 @@ export default function AdminDashboard() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { title: 'Add Product', icon: '📦', href: '/admin/products/new', color: 'blue' },
-                { title: 'Inventory', icon: '📊', href: '/admin/inventory', color: 'green' },
-                { title: 'Orders', icon: '📋', href: '/admin/orders', color: 'purple' },
-                { title: 'Settings', icon: '⚙️', href: '/admin/settings', color: 'gray' },
+                { title: "Products", href: "/admin/products" },
+                { title: "Orders", href: "/admin/orders" },
+                { title: "Inventory", href: "/admin/inventory" },
+                { title: "Settings", href: "/admin/settings" },
               ].map((action, idx) => (
-                <Link 
+                <Link
                   key={idx}
                   href={action.href}
-                  className="group relative p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl transition-all duration-300 hover:-translate-y-1 text-center"
+                  className="group relative p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all duration-300 hover:-translate-y-1 text-center"
                 >
-                  <div className={`w-12 h-12 mx-auto mb-4 rounded-xl bg-${action.color}-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform`}>
-                    {action.icon}
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                    📌
                   </div>
                   <h3 className="font-semibold text-gray-200 group-hover:text-white transition-colors">
                     {action.title}
@@ -244,83 +220,60 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Inventory Status */}
-          <div>
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
-              Inventory Health
+          {/* Chat Panel */}
+          <div className="lg:col-span-1 flex flex-col bg-white/10 p-4 rounded-2xl border border-white/20 backdrop-blur-lg">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              Client Messages
             </h2>
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <div className="space-y-4">
-                {stats?.inventoryStatus && Object.keys(stats.inventoryStatus).length > 0 ? (
-                  Object.entries(stats.inventoryStatus).map(([status, count]) => {
-                    const config: Record<string, { color: string, label: string }> = {
-                      available: { color: 'bg-green-500', label: 'Available' },
-                      rented: { color: 'bg-blue-500', label: 'Rented' },
-                      maintenance: { color: 'bg-yellow-500', label: 'Maintenance' },
-                      damaged: { color: 'bg-red-500', label: 'Damaged' },
-                      retired: { color: 'bg-gray-500', label: 'Retired' }
-                    };
-                    const { color, label } = config[status] || { color: 'bg-gray-500', label: status };
-                    const total = Object.values(stats.inventoryStatus).reduce((a, b) => a + b, 0);
-                    const percentage = Math.round((count / total) * 100);
-
-                    return (
-                      <div key={status} className="group">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-300">{label}</span>
-                          <span className="text-gray-400">{count} units ({percentage}%)</span>
-                        </div>
-                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${color} opacity-80 group-hover:opacity-100 transition-all duration-500`}
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No inventory data available</p>
+            <div className="flex-1 overflow-y-auto space-y-3 max-h-96">
+              {chatLoading ? (
+                <p className="text-gray-400 text-center">Loading chats...</p>
+              ) : chatMessages.length === 0 ? (
+                <p className="text-gray-400 text-center">No messages yet.</p>
+              ) : (
+                chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`p-2 rounded-2xl cursor-pointer transition-colors ${
+                      selectedMessage?.id === msg.id
+                        ? "bg-white/20"
+                        : "hover:bg-white/10"
+                    }`}
+                    onClick={() => setSelectedMessage(msg)}
+                  >
+                    <p className="text-sm font-semibold">{msg.userName}</p>
+                    <p className="text-gray-200 text-sm">{msg.message}</p>
+                    {msg.reply && (
+                      <p className="text-green-400 text-sm mt-1">
+                        Reply: {msg.reply}
+                      </p>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {new Date(msg.created_at).toLocaleString()}
+                    </span>
                   </div>
-                )}
-              </div>
-              <div className="mt-6 pt-6 border-t border-white/10">
-                <Link 
-                  href="/admin/inventory"
-                  className="block w-full py-3 text-center bg-white/5 hover:bg-white/10 rounded-xl text-sm font-medium text-gray-300 hover:text-white transition-colors"
-                >
-                  View Detailed Report
-                </Link>
-              </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
             </div>
-          </div>
-        </div>
 
-        {/* System Status Grid */}
-        <div>
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <span className="w-1 h-6 bg-green-500 rounded-full"></span>
-            System Status
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'API Status', status: 'Online', color: 'green', icon: '⚡' },
-              { label: 'Database', status: 'Connected', color: 'blue', icon: '💾' },
-              { label: 'Orders', status: `${stats?.totalOrders || 0} Total`, color: 'purple', icon: '📈' },
-              { label: 'Performance', status: 'Optimal', color: 'emerald', icon: '🚀' },
-            ].map((item, idx) => (
-              <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg bg-${item.color}-500/20 flex items-center justify-center text-xl`}>
-                  {item.icon}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-semibold">{item.label}</p>
-                  <p className={`text-sm font-bold text-${item.color}-400`}>{item.status}</p>
-                </div>
+            {selectedMessage && (
+              <div className="flex gap-2 mt-2">
+                <input
+                  type="text"
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  className="flex-1 bg-white/10 text-white rounded-xl px-4 py-2 focus:outline-none"
+                  placeholder="Type your reply..."
+                />
+                <button
+                  onClick={sendReply}
+                  className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-white font-semibold transition-colors"
+                >
+                  Send
+                </button>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

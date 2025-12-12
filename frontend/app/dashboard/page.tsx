@@ -1,145 +1,158 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Navbar from '../../components/Navbar';
-import { useAuth } from '../../contexts/AuthContext';
-import { apiGet } from '../../lib/api';
+import { useEffect, useState, useRef } from "react";
+import { apiGet, apiPost } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import Navbar from "../../components/Navbar";
+
+// Types
+type Rental = {
+  id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  total_amount: number;
+};
+
+type Order = {
+  id: string;
+  created_at: string;
+  status: string;
+  total_amount: number;
+};
+
+type ChatMessage = {
+  id: string;
+  sender: "user" | "admin";
+  message: string;
+  reply?: string | null;
+  created_at: string;
+};
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'rentals' | 'orders'>('rentals');
-  const [rentals, setRentals] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+
+  const [activeTab, setActiveTab] = useState<"rentals" | "orders">("rentals");
+  const [rentals, setRentals] = useState<Rental[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Chat states
+  const [chats, setChats] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatLoading, setChatLoading] = useState(true);
+  const [typing, setTyping] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Redirect admin users
   useEffect(() => {
-    if (authLoading) return;
-
-    if (!user) {
-      router.push('/login?redirect=/dashboard');
-      return;
+    if (!authLoading && user?.role === "admin") {
+      router.push("/admin/dashboard");
     }
+  }, [user, authLoading, router]);
 
-    if (user.role === 'admin') {
-      router.push('/admin/dashboard');
-      return;
-    }
+  // Fetch dashboard data & chat
+  useEffect(() => {
+    if (authLoading || !token || user?.role === "admin") return;
 
-    fetchData();
-  }, [user, router, authLoading]);
+    fetchDashboardData();
+    fetchUserChats();
 
-  const fetchData = async () => {
+    const interval = setInterval(fetchUserChats, 30000);
+    return () => clearInterval(interval);
+  }, [user, authLoading]);
+
+  // Auto-scroll on new message
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chats]);
+
+  // Fetch rentals & orders
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       const [rentalsData, ordersData] = await Promise.all([
-        apiGet('/rentals'),
-        apiGet('/sales_orders')
+        apiGet<Rental[]>("/rentals"),
+        apiGet<Order[]>("/sales_orders"),
       ]);
       setRentals(rentalsData);
       setOrders(ordersData);
     } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
+      console.error("Failed to fetch dashboard data:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      paid: 'bg-green-100 text-green-800',
-      processing: 'bg-blue-100 text-blue-800',
-      in_transit: 'bg-purple-100 text-purple-800',
-      active: 'bg-green-100 text-green-800',
-      delivered: 'bg-indigo-100 text-indigo-800',
-      completed: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
-      shipped: 'bg-blue-100 text-blue-800'
-    };
-
-    return (
-      <span className={`px-2 py-1 text-xs rounded-full ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.replace('_', ' ').charAt(0).toUpperCase() + status.replace('_', ' ').slice(1)}
-      </span>
-    );
-  };
-
-  const getDeliveryProgress = (status: string, type: 'rental' | 'order') => {
-    const rentalSteps = ['pending', 'confirmed', 'in_transit', 'active', 'returned'];
-    const orderSteps = ['pending', 'paid', 'processing', 'in_transit', 'delivered'];
-    const steps = type === 'rental' ? rentalSteps : orderSteps;
-    const currentIndex = steps.indexOf(status);
-    
-    if (currentIndex === -1 || status === 'cancelled' || status === 'completed') return null;
-    
-    return (
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-          <span>Order Progress</span>
-          <span>{Math.round(((currentIndex + 1) / steps.length) * 100)}%</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {steps.map((step, idx) => (
-            <div key={step} className="flex-1">
-              <div className={`h-2 rounded-full ${
-                idx <= currentIndex ? 'bg-blue-600' : 'bg-gray-200'
-              }`} />
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>{steps[0].replace('_', ' ')}</span>
-          <span>{steps[steps.length - 1].replace('_', ' ')}</span>
-        </div>
-      </div>
-    );
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-// Helper to calculate days remaining
-  const getDaysRemaining = (endDate: string) => {
-    const end = new Date(endDate);
-    const now = new Date();
-    const diffTime = end.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const handleConfirmReceipt = async (id: string, type: 'rental' | 'order') => {
-    if (!confirm('Confirm that you have received the items?')) return;
+  // Fetch user chat messages
+  const fetchUserChats = async () => {
+    if (!token) return; // Don't fetch if token missing
     try {
-      const endpoint = type === 'rental' ? `/rentals/${id}` : `/sales_orders/${id}`;
-      const status = type === 'rental' ? 'active' : 'delivered'; // Rental becomes active, Order becomes delivered
-      
-      await fetch(`http://localhost:4000/api${endpoint}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ status })
-      });
-      fetchData();
+      setChatLoading(true);
+
+      // Pass the token to apiGet
+      const data = await apiGet<{ chats: ChatMessage[] }>("/chats", token);
+
+      setChats(data.chats || []);
     } catch (err) {
-      alert('Failed to update status');
+      console.error("Failed to fetch chats:", err);
+    } finally {
+      setChatLoading(false);
+      console.log("the token is", token);
     }
   };
 
+  // Send chat message
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return;
+
+    const msg = newMessage;
+    setNewMessage("");
+
+    // Optimistic UI
+    const tempMessage: ChatMessage = {
+      id: "temp-" + Date.now(),
+      sender: "user",
+      message: msg,
+      created_at: new Date().toISOString(),
+    };
+    setChats((prev) => [...prev, tempMessage]);
+
+    try {
+      if (!token) throw new Error("No token available");
+
+      const data = await apiPost<{ chat: ChatMessage }>(
+        "/chats",
+        { message: msg },
+        token
+      );
+
+      // Replace temp message with real saved message
+      setChats((prev) =>
+        prev.map((m) => (m.id === tempMessage.id ? data.chat : m))
+      );
+    } catch (err) {
+      console.error("Failed to send message:", err);
+    }
+  };
+
+  const formatTime = (date: string) =>
+    new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-black text-gray-900 dark:text-white transition-colors duration-300">
+    <div
+      className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 
+      dark:from-gray-900 dark:via-gray-800 dark:to-black text-gray-900 dark:text-white 
+      transition-colors duration-300"
+    >
       <Navbar />
-      
-      {/* Background Elements */}
+
+      {/* Glowing background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-3xl"></div>
@@ -147,175 +160,158 @@ export default function DashboardPage() {
 
       <div className="relative container mx-auto px-4 py-12 pt-24">
         <h1 className="text-4xl font-black mb-8">
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+          <span
+            className="bg-gradient-to-r from-blue-600 to-purple-600 
+            dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 
+            bg-clip-text text-transparent"
+          >
             My Dashboard
           </span>
         </h1>
 
-        {/* Tabs */}
-        <div className="flex space-x-4 mb-8 border-b border-gray-200 dark:border-white/10">
-          <button
-            onClick={() => setActiveTab('rentals')}
-            className={`pb-3 px-4 font-medium transition-all ${
-              activeTab === 'rentals'
-                ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            My Rentals ({rentals.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`pb-3 px-4 font-medium transition-all ${
-              activeTab === 'orders'
-                ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            My Orders ({orders.length})
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-20">
-            <div className="inline-block relative">
-              <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* LEFT PANEL */}
+          <div className="flex-1">
+            {/* Tabs */}
+            <div className="flex space-x-4 mb-8 border-b border-gray-200 dark:border-white/10">
+              <button
+                onClick={() => setActiveTab("rentals")}
+                className={`pb-3 px-4 font-medium transition-all ${
+                  activeTab === "rentals"
+                    ? "border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                My Rentals ({rentals.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("orders")}
+                className={`pb-3 px-4 font-medium transition-all ${
+                  activeTab === "orders"
+                    ? "border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                }`}
+              >
+                My Orders ({orders.length})
+              </button>
             </div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400">Loading your activity...</p>
-          </div>
-        ) : (
-          <>
-            {/* Rentals Tab */}
-            {activeTab === 'rentals' && (
-              <div className="space-y-6">
-                {rentals.length === 0 ? (
-                  <div className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-12 text-center shadow-xl dark:shadow-none transition-colors duration-300">
-                    <div className="text-6xl mb-4">📺</div>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">You haven't made any rental bookings yet.</p>
-                    <a href="/products" className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-blue-500/20">
-                      Browse LED Screens →
-                    </a>
-                  </div>
-                ) : (
-                  rentals.map((rental) => {
-                    const daysLeft = getDaysRemaining(rental.end_date);
-                    const isActive = rental.status === 'active';
-                    
-                    return (
-                      <div key={rental.id} className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-6 hover:border-blue-300 dark:hover:border-white/20 transition-all group shadow-lg dark:shadow-none">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                Rental #{rental.id.slice(0, 8)}
-                              </h3>
-                              {getStatusBadge(rental.status)}
-                            </div>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">
-                              {formatDate(rental.start_date)} - {formatDate(rental.end_date)}
-                            </p>
-                            {isActive && (
-                              <p className={`text-sm font-bold mt-2 ${daysLeft < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                {daysLeft < 0 ? `Overdue by ${Math.abs(daysLeft)} days` : `${daysLeft} days remaining`}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end gap-3">
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                              ${rental.total_amount}
-                            </p>
-                            {rental.status === 'confirmed' && (
-                              <button 
-                                onClick={() => handleConfirmReceipt(rental.id, 'rental')}
-                                className="text-sm bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30 px-4 py-2 rounded-lg hover:bg-green-200 dark:hover:bg-green-500/30 transition-colors"
-                              >
-                                Confirm Receipt
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Delivery Progress */}
-                        <div className="bg-gray-100 dark:bg-black/20 rounded-xl p-4 mb-4">
-                          {getDeliveryProgress(rental.status, 'rental')}
-                        </div>
-                        
-                        <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-white/10">
-                          <button
-                            onClick={() => router.push(`/rentals/${rental.id}`)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-2 group-hover:translate-x-1 transition-transform"
-                          >
-                            View Details <span className="text-lg">→</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
 
-            {/* Orders Tab */}
-            {activeTab === 'orders' && (
+            {/* Cards */}
+            {loading ? (
+              <div className="text-center text-gray-400 py-10">Loading...</div>
+            ) : (
               <div className="space-y-6">
-                {orders.length === 0 ? (
-                  <div className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-12 text-center shadow-xl dark:shadow-none transition-colors duration-300">
-                    <div className="text-6xl mb-4">🛒</div>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">You haven't placed any orders yet.</p>
-                    <a href="/products" className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-blue-500/20">
-                      Browse LED Screens →
-                    </a>
-                  </div>
-                ) : (
-                  orders.map((order) => (
-                    <div key={order.id} className="bg-white/80 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-white/20 dark:border-white/10 p-6 hover:border-blue-300 dark:hover:border-white/20 transition-all group shadow-lg dark:shadow-none">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                              Order #{order.id.slice(0, 8)}
-                            </h3>
-                            {getStatusBadge(order.status)}
-                          </div>
-                          <p className="text-gray-500 dark:text-gray-400 text-sm">
-                            Placed on {formatDate(order.created_at)}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-3">
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            ${order.total_amount}
-                          </p>
-                          {order.status === 'shipped' && (
-                            <button 
-                              onClick={() => handleConfirmReceipt(order.id, 'order')}
-                              className="text-sm bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30 px-4 py-2 rounded-lg hover:bg-green-200 dark:hover:bg-green-500/30 transition-colors"
-                            >
-                              Confirm Delivery
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Delivery Progress */}
-                      <div className="bg-gray-100 dark:bg-black/20 rounded-xl p-4 mb-4">
-                        {getDeliveryProgress(order.status, 'order')}
-                      </div>
-                      
-                      <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-white/10">
-                        <button
-                          onClick={() => router.push(`/orders/${order.id}`)}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-2 group-hover:translate-x-1 transition-transform"
-                        >
-                          View Details <span className="text-lg">→</span>
-                        </button>
+                {activeTab === "rentals" &&
+                  rentals.map((r) => (
+                    <div
+                      key={r.id}
+                      className="bg-white/20 dark:bg-white/5 backdrop-blur-md 
+                      border border-white/20 dark:border-white/10 p-6 rounded-2xl shadow-lg"
+                    >
+                      <div className="flex justify-between">
+                        <p className="font-semibold">
+                          Rental #{r.id.slice(0, 8)} – {r.status}
+                        </p>
+                        <p className="font-bold">${r.total_amount}</p>
                       </div>
                     </div>
-                  ))
-                )}
+                  ))}
+
+                {activeTab === "orders" &&
+                  orders.map((o) => (
+                    <div
+                      key={o.id}
+                      className="bg-white/20 dark:bg-white/5 backdrop-blur-md 
+                      border border-white/20 dark:border-white/10 p-6 rounded-2xl shadow-lg"
+                    >
+                      <div className="flex justify-between">
+                        <p className="font-semibold">
+                          Order #{o.id.slice(0, 8)} – {o.status}
+                        </p>
+                        <p className="font-bold">${o.total_amount}</p>
+                      </div>
+                    </div>
+                  ))}
               </div>
             )}
-          </>
-        )}
+          </div>
+
+          {/* CHAT WIDGET */}
+          <div
+            className="w-full lg:w-96 flex flex-col bg-white/10 dark:bg-black/30 
+            backdrop-blur-xl border border-white/20 dark:border-white/10 
+            rounded-2xl shadow-2xl h-[600px] p-5"
+          >
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              💬 Support Chat
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+            </h2>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+              {chatLoading ? (
+                <p className="text-gray-400 text-center">Loading chat...</p>
+              ) : (
+                chats.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow transition-all 
+                    ${
+                      msg.sender === "user"
+                        ? "ml-auto bg-blue-600 text-white"
+                        : "mr-auto bg-white/20 dark:bg-white/10"
+                    }`}
+                  >
+                    <p>{msg.message}</p>
+                    <span className="text-[10px] block mt-1 opacity-70">
+                      {formatTime(msg.created_at)}
+                    </span>
+
+                    {/* admin reply attached to the same row */}
+                    {msg.reply ? (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          paddingLeft: 12,
+                          borderLeft: "3px solid #ddd",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          Admin reply
+                        </div>
+                        <div style={{ marginTop: 4 }}>{msg.reply}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              )}
+
+              {typing && (
+                <div className="mr-auto bg-white/20 px-3 py-1 rounded-xl text-xs animate-pulse">
+                  Admin is typing...
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 px-4 py-2 rounded-xl bg-white/20 text-white 
+                  focus:outline-none border border-white/20"
+              />
+              <button
+                onClick={sendMessage}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 
+                  text-white font-semibold"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
